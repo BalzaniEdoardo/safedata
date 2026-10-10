@@ -3,10 +3,10 @@
 Serves a page on 127.0.0.1 where the records can be edited as a table. The
 page builds its inputs from the schema and asks the server to check edited
 cells, so all rules live in schema.py. Saving validates the changes and writes
-data/records.csv. It does nothing else: the
-file then shows up in git as changed, and committing it is up to the user.
+the records file. It does nothing else: the file then shows up in git as
+changed, and committing it is up to the user.
 
-The page also resolves merge conflicts left in records.csv by `git pull`,
+The page also resolves merge conflicts left in the records file by `git pull`,
 by choosing one version per record, and shows (read-only) which records
 differ from the last commit.
 """
@@ -23,10 +23,9 @@ from pathlib import Path
 
 from . import gitops, store
 from .changeset import Changeset, apply, diff
-from .schema import Schema, canon, check_value, input_spec, load_schema, validate
+from .dataset import Dataset
+from .schema import Schema, canon, check_value, input_spec, validate
 
-DATA_FILE = "data/records.csv"
-SCHEMA_FILE = "data/schema.yaml"
 WEB_DIR = Path(__file__).with_name("web")
 STATIC = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"),
           "/style.css": ("style.css", "text/css")}
@@ -46,11 +45,12 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def get_state(root: Path) -> dict:
-    schema = load_schema(root / SCHEMA_FILE)
-    text = (root / DATA_FILE).read_text(encoding="utf-8")
+def get_state(ds: Dataset) -> dict:
+    schema = ds.load_schema()
+    text = ds.records_path.read_text(encoding="utf-8")
     state = {
-        "file": DATA_FILE,
+        "dataset": str(ds.root),
+        "file": ds.records,
         "schema": {"key": schema.key,
                    "columns": [{**asdict(c), "input": input_spec(c)} for c in schema.columns]},
         "version": _digest(text),
@@ -66,26 +66,26 @@ def get_state(root: Path) -> dict:
                               for k, (o, t) in sorted(pairs.items(), key=lambda p: schema.sort_key(p[0]))]
     else:
         state["rows"] = store.read_text(text, schema)
-        state["uncommitted"] = _uncommitted(root, schema, state["rows"])
+        state["uncommitted"] = _uncommitted(ds, schema, state["rows"])
     try:
-        state["git"] = gitops.status(root)
+        state["git"] = gitops.status(ds.root)
     except (gitops.GitError, OSError):
         pass
     return state
 
 
-def _uncommitted(root: Path, schema: Schema, rows: store.Rows) -> list[str] | None:
+def _uncommitted(ds: Dataset, schema: Schema, rows: store.Rows) -> list[str] | None:
     """Record-level differences between the working file and the last commit."""
     try:
-        committed = store.read_text(gitops.show(root, "HEAD", DATA_FILE), schema)
+        committed = store.read_text(gitops.show(ds.root, "HEAD", f"./{ds.records}"), schema)
     except (gitops.GitError, ValueError, OSError):
         return None
     return diff(committed, rows, schema).describe(schema)
 
 
-def check(root: Path, payload: dict) -> dict:
+def check(ds: Dataset, payload: dict) -> dict:
     """Problems per cell for rows being edited: {row id: {column: message}}."""
-    schema = load_schema(root / SCHEMA_FILE)
+    schema = ds.load_schema()
     out = {}
     for uid, values in payload.get("rows", {}).items():
         problems = {c.name: p for c in schema.columns if c.name != schema.key
@@ -94,14 +94,14 @@ def check(root: Path, payload: dict) -> dict:
     return {"problems": out}
 
 
-def save(root: Path, payload: dict) -> dict:
-    """Apply the edits sent by the page and write records.csv."""
-    schema = load_schema(root / SCHEMA_FILE)
+def save(ds: Dataset, payload: dict) -> dict:
+    """Apply the edits sent by the page and write the records file."""
+    schema = ds.load_schema()
     with _lock:
-        path = root / DATA_FILE
+        path = ds.records_path
         text = path.read_text(encoding="utf-8")
         if store.has_conflicts(text):
-            raise Refused("records.csv has unresolved merge conflicts. Resolve them first.")
+            raise Refused(f"{ds.records} has unresolved merge conflicts. Resolve them first.")
         current = store.read_text(text, schema)
         cs = _changeset(payload, schema)
         if cs.is_empty():
@@ -110,7 +110,7 @@ def save(root: Path, payload: dict) -> dict:
         # git pull), each edit is checked against the current value.
         result = apply(current, cs, schema)
         if result.conflicts:
-            raise Refused("records.csv was changed on disk since this page was loaded, and some of "
+            raise Refused(f"{ds.records} was changed on disk since this page was loaded, and some of "
                           "your edits clash with that. Nothing was saved.",
                           [c.describe() for c in result.conflicts])
         errors = validate(schema.names, result.rows, schema)
@@ -119,7 +119,7 @@ def save(root: Path, payload: dict) -> dict:
         store.write_file(path, result.rows, schema)
     for i, key in result.assigned.items():
         cs.adds[i] = {**cs.adds[i], schema.key: key}
-    return {"saved": cs.describe(schema) + result.notes, "state": get_state(root)}
+    return {"saved": cs.describe(schema) + result.notes, "state": get_state(ds)}
 
 
 def _changeset(payload: dict, schema: Schema) -> Changeset:
@@ -135,14 +135,14 @@ def _changeset(payload: dict, schema: Schema) -> Changeset:
     )
 
 
-def resolve(root: Path, payload: dict) -> dict:
-    """Write records.csv with one chosen version ("local" or "incoming") per conflicting record."""
-    schema = load_schema(root / SCHEMA_FILE)
+def resolve(ds: Dataset, payload: dict) -> dict:
+    """Write the records file with one chosen version ("local" or "incoming") per conflicting record."""
+    schema = ds.load_schema()
     with _lock:
-        path = root / DATA_FILE
+        path = ds.records_path
         text = path.read_text(encoding="utf-8")
         if _digest(text) != payload.get("version"):
-            raise Refused("records.csv changed on disk since this page was loaded. Reload the page.")
+            raise Refused(f"{ds.records} changed on disk since this page was loaded. Reload the page.")
         rows, pairs = store.parse_conflicted(text, schema)
         choices = payload.get("choices", {})
         missing = [k for k in pairs if choices.get(k) not in ("local", "incoming")]
@@ -156,12 +156,12 @@ def resolve(root: Path, payload: dict) -> dict:
         if errors:
             raise Refused("The chosen versions do not pass the checks:", errors)
         store.write_file(path, rows, schema)
-    return {"state": get_state(root)}
+    return {"state": get_state(ds)}
 
 
 # ---------------------------------------------------------------- HTTP server
 
-def make_handler(root: Path, token: str):
+def make_handler(ds: Dataset, token: str):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):  # keep the terminal quiet
             pass
@@ -188,7 +188,7 @@ def make_handler(root: Path, token: str):
                 name, ctype = STATIC[path]
                 self._send(200, (WEB_DIR / name).read_bytes(), ctype)
             elif path == "/api/state" and self._authorized():
-                self._run(lambda: get_state(root))
+                self._run(lambda: get_state(ds))
             elif not path.startswith("/api/"):
                 self._send(404, b"Not found", "text/plain")
 
@@ -199,7 +199,7 @@ def make_handler(root: Path, token: str):
             payload = json.loads(self.rfile.read(length) or b"{}")
             actions = {"/api/check": check, "/api/save": save, "/api/resolve": resolve}
             if self.path in actions:
-                self._run(lambda: actions[self.path](root, payload))
+                self._run(lambda: actions[self.path](ds, payload))
             else:
                 self._json(404, {"error": "Not found"})
 
@@ -214,9 +214,9 @@ def make_handler(root: Path, token: str):
     return Handler
 
 
-def serve(root: Path, port: int = 0) -> tuple[ThreadingHTTPServer, str]:
+def serve(ds: Dataset, port: int = 0) -> tuple[ThreadingHTTPServer, str]:
     """Start the server on 127.0.0.1 and return it with the page URL."""
     token = secrets.token_urlsafe(16)
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(root, token))
+    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(ds, token))
     url = f"http://127.0.0.1:{server.server_address[1]}/#{token}"
     return server, url

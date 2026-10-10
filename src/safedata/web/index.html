@@ -11,6 +11,7 @@
     <h1>Records editor <span id="file"></span></h1>
     <div id="gitinfo"></div>
   </header>
+  <p id="location"></p>
 
   <div id="message" hidden></div>
 
@@ -21,23 +22,23 @@
       <button id="add">Add record</button>
       <span id="summary"></span>
       <button id="discard">Discard edits</button>
-      <button id="save" class="primary">Save to records.csv</button>
+      <button id="save" class="primary">Save to <span class="records-file"></span></button>
     </div>
     <div class="table-wrap"><table id="table"><thead></thead><tbody></tbody></table></div>
-    <p class="hint">Click a column title to sort. Edited cells are highlighted; cells with a problem are outlined in red (hover for details). Saving writes <code>data/records.csv</code> and nothing else.</p>
+    <p class="hint">Click a column title to sort. Edited cells are highlighted; cells with a problem are outlined in red (hover for details). Saving writes <code class="records-file"></code> and nothing else.</p>
   </section>
 
   <section id="uncommitted" hidden>
     <h2>Saved but not yet committed</h2>
-    <p>These records in <code>data/records.csv</code> differ from the last commit. Review and commit the file with your git tool to add them to the history.</p>
+    <p>These records in <code class="records-file"></code> differ from the last commit. Review and commit the file with your git tool to add them to the history.</p>
     <ul id="uncommitted-list"></ul>
   </section>
 
   <section id="conflicts" hidden>
-    <h2>Merge conflicts in records.csv</h2>
-    <p>The last <code>git pull</code> or merge changed some records both here and in the incoming commits. Choose one version of each record, then write the file. Afterwards, mark <code>data/records.csv</code> as resolved in your git tool (stage it) and commit the merge.</p>
+    <h2>Merge conflicts in <span class="records-file"></span></h2>
+    <p>The last <code>git pull</code> or merge changed some records both here and in the incoming commits. Choose one version of each record, then write the file. Writing the file is all this page does: afterwards, review the diff in your git tool, stage <code class="records-file"></code> and commit to finish the merge.</p>
     <div id="conflict-list"></div>
-    <button id="resolve" class="primary" disabled>Write resolved records.csv</button>
+    <button id="resolve" class="primary" disabled>Write resolved <span class="records-file"></span></button>
   </section>
 
   <script src="app.js"></script>

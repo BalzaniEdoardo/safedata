@@ -5,17 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def load(repo: str | Path = "."):
-    """Load the records as a typed pandas DataFrame (for Python-based analysis)."""
+def load(path: str | Path = "."):
+    """Load the records of the dataset containing `path` as a typed pandas DataFrame."""
     import pandas as pd
 
-    from . import gitops
-    from .webapp import DATA_FILE, SCHEMA_FILE
-    from .schema import load_schema
+    from . import dataset
 
-    root = gitops.repo_root(repo)
-    schema = load_schema(root / SCHEMA_FILE)
-    df = pd.read_csv(root / DATA_FILE, dtype=str, keep_default_na=False)
+    ds = dataset.find(path)
+    schema = ds.load_schema()
+    df = pd.read_csv(ds.records_path, dtype=str, keep_default_na=False)
     for col in schema.columns:
         s = df[col.name].replace("", None)
         if col.type == "int":

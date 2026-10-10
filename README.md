@@ -22,7 +22,7 @@ Because the history is plain git, any git client can show it: the command line, 
 ## Editing records
 
 1. Get the latest commits (`git pull`, or the client's pull/sync button).
-2. Start the editor: double-click `launchers/edit.command` (Mac) or `launchers/edit.cmd` (Windows), or run `uv run safedata edit`. A browser tab opens. Keep the terminal window open while editing.
+2. Start the editor: run `safedata edit` inside the dataset folder. It opens a tab in the default browser. Keep the terminal window open while editing.
 3. Edit the table. Each column has an input that matches its type: dropdowns for choices and true/false, a date picker for dates. Edited cells are highlighted, and cells with a problem are outlined in red. *Add record* adds a row, and the record number is assigned on save. *Delete* marks a row for deletion until you save.
 4. Click **Save to records.csv**. The editor checks every edit against `data/schema.yaml` and writes the file. If a check fails, nothing is written and the problems are listed.
 
@@ -113,7 +113,6 @@ The editor reads the schema when it loads: it builds each column's input from it
 data/records.csv        the records (canonical CSV)
 data/schema.yaml        column definitions and rules
 src/safedata/           schema, store, changeset, merge, webapp (editor), cli; web/ holds the page
-launchers/              double-click wrappers for the editor
 docs/EXCEL_SETUP.md     connecting an analysis workbook
 tests/
 ```

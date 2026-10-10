@@ -4,12 +4,12 @@ import pytest
 
 from safedata.schema import load_schema
 
-ROOT = Path(__file__).resolve().parents[1]
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 @pytest.fixture
 def schema():
-    return load_schema(ROOT / "data" / "schema.yaml")
+    return load_schema(FIXTURES / "schema.yaml")
 
 
 def make_row(id, **kw):

@@ -15,7 +15,8 @@ body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
        font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
 header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 h1 { font-size: 20px; margin: 0 0 12px; }
-h1 span, #gitinfo, .hint { color: var(--muted); font-weight: normal; font-size: 13px; }
+h1 span, #gitinfo, #location, .hint { color: var(--muted); font-weight: normal; font-size: 13px; }
+#location { margin: 0 0 12px; font-family: ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
 h2 { font-size: 16px; margin: 24px 0 8px; }
 code { font-size: 12px; background: var(--head); padding: 1px 4px; border-radius: 4px; }
 button { font: inherit; padding: 5px 12px; border: 1px solid var(--line); border-radius: 6px;

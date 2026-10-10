@@ -37,6 +37,8 @@ async function load(message) {
     return;
   }
   $("file").textContent = state.file;
+  $("location").textContent = `Dataset folder: ${state.dataset}`;
+  for (const el of document.querySelectorAll(".records-file")) el.textContent = state.file;
   renderGitInfo();
   rows = state.rows.map((r) => ({ uid: nextUid++, orig: r, cur: { ...r }, deleted: false, problems: {} }));
   const inConflict = Array.isArray(state.conflicts);
@@ -242,7 +244,7 @@ async function save() {
   $("save").disabled = true;
   try {
     const res = await api("/api/save", editsPayload());
-    const text = "Saved to records.csv. The file now shows as changed in git; commit it with your git tool to record it in the history.";
+    const text = `Saved to ${state.file}. The file now shows as changed in git; commit it with your git tool to record it in the history.`;
     await load([text, "ok", res.saved]);
   } catch (e) {
     showMessage(e.message, "error", e.problems);
@@ -291,7 +293,7 @@ function renderConflicts() {
   $("resolve").onclick = async () => {
     try {
       await api("/api/resolve", { version: state.version, choices });
-      await load(["Conflicts resolved and records.csv written. In your git tool, stage data/records.csv and commit to finish the merge.", "ok"]);
+      await load([`Resolved file written to ${state.file}. Review the diff in your git tool, then stage the file and commit to finish the merge.`, "ok"]);
     } catch (e) {
       showMessage(e.message, "error", e.problems);
     }

@@ -5,25 +5,24 @@ import urllib.error
 import urllib.request
 
 import pytest
-from conftest import ROOT, make_row
+from conftest import FIXTURES, make_row
 
-from safedata import store, webapp
-from safedata.schema import load_schema
+from safedata import dataset, store, webapp
 
 
 @pytest.fixture
 def folder(tmp_path):
-    """A records folder outside git with three records."""
+    """A dataset outside git with three records."""
+    (tmp_path / "safedata.toml").write_text('records = "data/records.csv"\nschema = "data/schema.yaml"\n')
     (tmp_path / "data").mkdir()
-    shutil.copy(ROOT / "data" / "schema.yaml", tmp_path / "data" / "schema.yaml")
-    schema = load_schema(tmp_path / "data" / "schema.yaml")
-    store.write_file(tmp_path / "data" / "records.csv", [make_row(1), make_row(2), make_row(3)], schema)
-    return tmp_path
+    shutil.copy(FIXTURES / "schema.yaml", tmp_path / "data" / "schema.yaml")
+    ds = dataset.load(tmp_path)
+    store.write_file(ds.records_path, [make_row(1), make_row(2), make_row(3)], ds.load_schema())
+    return ds
 
 
-def records(folder):
-    schema = load_schema(folder / "data" / "schema.yaml")
-    return store.read_file(folder / "data" / "records.csv", schema)
+def records(ds):
+    return store.read_file(ds.records_path, ds.load_schema())
 
 
 def test_state(folder):
@@ -34,7 +33,7 @@ def test_state(folder):
 
 
 def test_save_writes_only_the_csv(folder):
-    before = set(folder.rglob("*"))
+    before = set(folder.root.rglob("*"))
     state = webapp.get_state(folder)
     res = webapp.save(folder, {
         "version": state["version"],
@@ -42,7 +41,7 @@ def test_save_writes_only_the_csv(folder):
         "updates": {"1": {"value": ["1.5", "42"]}},
         "deletes": {"2": make_row(2)},
     })
-    assert set(folder.rglob("*")) == before
+    assert set(folder.root.rglob("*")) == before
     assert [(r["id"], r["value"], r["observer"], r["site"]) for r in records(folder)] == [
         ("1", "42", "Maria", "North"), ("3", "1.5", "Maria", "North"), ("4", "1.5", "Luca", "South")]
     assert "+ record 4: " in res["saved"][0]
@@ -57,7 +56,7 @@ def test_save_refuses_invalid_and_conflicting_edits(folder):
     # the file changes on disk (e.g. after git pull) while the page still shows the old values
     rows = records(folder)
     rows[0]["value"] = "99"
-    store.write_file(folder / "data" / "records.csv", rows, load_schema(folder / "data" / "schema.yaml"))
+    store.write_file(folder.records_path, rows, folder.load_schema())
     with pytest.raises(webapp.Refused) as e:
         webapp.save(folder, {"version": state["version"], "updates": {"1": {"value": ["1.5", "42"]}}})
     assert "record 1, value" in e.value.problems[0]
@@ -68,10 +67,9 @@ def test_save_refuses_invalid_and_conflicting_edits(folder):
 
 
 def test_resolve_conflicts(folder):
-    schema = load_schema(folder / "data" / "schema.yaml")
     pairs = {"2": (make_row(2, value="7"), make_row(2, value="8")), "3": (make_row(3), None)}
-    text = store.to_text_with_conflicts([make_row(1)], pairs, schema)
-    (folder / "data" / "records.csv").write_text(text, encoding="utf-8")
+    text = store.to_text_with_conflicts([make_row(1)], pairs, folder.load_schema())
+    folder.records_path.write_text(text, encoding="utf-8")
 
     state = webapp.get_state(folder)
     assert [c["key"] for c in state["conflicts"]] == ["2", "3"]
@@ -109,12 +107,10 @@ def test_check_uses_schema_rules(folder):
 
 def test_new_column_needs_only_a_schema_change(folder):
     """A column added to schema.yaml (and the CSV) is served and checked without code changes."""
-    schema_path = folder / "data" / "schema.yaml"
-    schema_path.write_text(schema_path.read_text() + (
+    folder.schema_path.write_text(folder.schema_path.read_text() + (
         "\n  - name: depth\n    type: int\n    min: 0\n    max: 50\n"
         "\n  - name: weather\n    type: choice\n    choices: [dry, wet]\n"), encoding="utf-8")
-    schema = load_schema(schema_path)
-    store.write_file(folder / "data" / "records.csv", [{**make_row(1), "depth": "3", "weather": "dry"}], schema)
+    store.write_file(folder.records_path, [{**make_row(1), "depth": "3", "weather": "dry"}], folder.load_schema())
 
     cols = {c["name"]: c["input"] for c in webapp.get_state(folder)["schema"]["columns"]}
     assert cols["depth"] == {"kind": "text", "inputmode": "numeric", "sort": "number"}

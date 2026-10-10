@@ -3,6 +3,3 @@
 # The three drivers are configured per copy by `safedata install`, which the
 # editor also runs on start.
 data/records.csv  filter=safedata merge=safedata diff=safedata text eol=lf
-
-*.cmd     text eol=crlf
-*.command text eol=lf
