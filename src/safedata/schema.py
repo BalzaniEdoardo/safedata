@@ -155,11 +155,12 @@ def _canon_date(value) -> str:
 
 
 def is_valid_value(value: str, col: Column) -> str | None:
-    """Return None if a canonical value is acceptable, else a short reason."""
+    """Return None if a canonical value is acceptable, else a sentence saying which rule
+    it breaks, written for the person who typed the value."""
     if value == "":
-        return "is required" if col.required else None
+        return "is empty, but this column is required" if col.required else None
     if "\n" in value or "\r" in value:
-        return "contains a line break"
+        return "contains a line break; values must fit on one line"
     t = col.type
     if t == "int":
         try:
@@ -175,23 +176,27 @@ def is_valid_value(value: str, col: Column) -> str | None:
         try:
             dt.date.fromisoformat(value)
         except ValueError:
-            return f"{value!r} is not a date (use YYYY-MM-DD)"
+            return f"{value!r} is not a date; write dates as YYYY-MM-DD, for example 2024-03-15"
         num = value
     elif t == "bool":
         if value not in ("true", "false"):
-            return f"{value!r} is not true/false"
+            return f"{value!r} is not true or false"
         return None
     elif t == "choice":
         if value not in col.choices:
-            return f"{value!r} is not one of: {', '.join(col.choices)}"
+            return f"{value!r} is not an allowed value; choose one of: {', '.join(col.choices)}"
         return None
     else:
         return None
 
     if col.min is not None and num < _typed(col.min, t):
-        return f"{value} is below the minimum {col.min}"
+        if t == "date":
+            return f"{value} is earlier than the earliest allowed date, {col.min}"
+        return f"{value} is smaller than the smallest allowed value, {col.min}"
     if col.max is not None and num > _typed(col.max, t):
-        return f"{value} is above the maximum {col.max}"
+        if t == "date":
+            return f"{value} is later than the latest allowed date, {col.max}"
+        return f"{value} is larger than the largest allowed value, {col.max}"
     return None
 
 

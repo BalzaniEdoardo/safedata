@@ -38,11 +38,11 @@ def test_validate_reports_problems(schema):
     errors = validate(schema.names, rows, schema)
     text = "\n".join(errors)
     assert "already used on line 2" in text
-    assert "'Moon' is not one of" in text
-    assert "not a date" in text
-    assert "below the minimum" in text
-    assert "observer: is required" in text
-    assert "1980-01-01 is below the minimum" in text
+    assert "'Moon' is not an allowed value; choose one of: North, South, East, West" in text
+    assert "'03/04/2020' is not a date; write dates as YYYY-MM-DD" in text
+    assert "value: -2 is smaller than the smallest allowed value, 0" in text
+    assert "observer: is empty, but this column is required" in text
+    assert "1980-01-01 is earlier than the earliest allowed date, 1990-03-26" in text
     assert validate(schema.names, [make_row(1), make_row(2)], schema) == []
 
 

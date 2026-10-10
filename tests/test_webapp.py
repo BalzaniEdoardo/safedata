@@ -51,7 +51,7 @@ def test_save_refuses_invalid_and_conflicting_edits(folder):
     state = webapp.get_state(folder)
     with pytest.raises(webapp.Refused) as e:
         webapp.save(folder, {"version": state["version"], "updates": {"1": {"site": ["North", "Moon"]}}})
-    assert "not one of" in e.value.problems[0]
+    assert "'Moon' is not an allowed value" in e.value.problems[0]
 
     # the file changes on disk (e.g. after git pull) while the page still shows the old values
     rows = records(folder)
