@@ -50,3 +50,17 @@ def test_outside_a_dataset(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     assert cli.main(["validate"]) == 1
     assert "not inside a dataset folder" in capsys.readouterr().err
+
+
+def test_pre_commit_check_passes_outside_a_dataset(tmp_path, monkeypatch, capsys):
+    """A hook left in a repository that is no longer a dataset must not block commits."""
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["validate", "--staged"]) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_missing_schema_file(ds, capsys):
+    ds.schema_path.unlink()
+    assert cli.main(["validate"]) == 1
+    err = capsys.readouterr().err
+    assert "schema file" in err and "does not exist" in err and "Traceback" not in err
