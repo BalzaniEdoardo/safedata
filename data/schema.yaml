@@ -1,0 +1,45 @@
+# Describes the records table. The tools use it to validate every change,
+# to normalize the CSV, and to build the editing workbook.
+#
+# Column types: int, float, date (YYYY-MM-DD), bool (true/false), choice, string.
+
+key: id
+
+columns:
+  - name: id
+    type: int
+    required: true
+    unique: true
+    description: Record number, assigned automatically for new records.
+
+  - name: date
+    type: date
+    required: true
+    min: 1990-03-26
+    description: Date of the observation.
+
+  - name: site
+    type: choice
+    required: true
+    choices: [North, South, East, West]
+
+  - name: category
+    type: choice
+    required: true
+    choices: [survey, sample, maintenance, incident]
+
+  - name: observer
+    type: string
+    required: true
+
+  - name: value
+    type: float
+    min: 0
+    description: Measured value, if any.
+
+  - name: verified
+    type: bool
+    description: Has the record been checked by a second person?
+
+  - name: notes
+    type: string

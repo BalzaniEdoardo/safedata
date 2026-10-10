@@ -1,0 +1,16 @@
+name: validate records
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Check records against the schema
+        run: uv run safedata validate
+      - name: Run tests
+        run: uv run pytest -q

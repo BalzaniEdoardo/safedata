@@ -1,0 +1,7 @@
+# Records are normalized (sorted, canonical values) whenever they are staged,
+# and merged record by record instead of line by line.
+# Both drivers are set up per copy by `safedata install` (run automatically by the launchers).
+data/records.csv  filter=safedata merge=safedata text eol=lf
+
+*.cmd     text eol=crlf
+*.command text eol=lf
