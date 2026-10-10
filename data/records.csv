@@ -4,7 +4,7 @@ id,date,site,category,observer,value,verified,notes
 3,1996-04-18,South,survey,Maria Rossi,66.13,true,
 4,1996-05-12,North,incident,Yuki Sato,70.26,true,
 5,1996-05-24,South,incident,Ana Silva,50.3,false,
-6,1996-07-09,South,sample,Maria Rossi,69.79,false,
+6,1996-07-09,South,sample,Maria Rossi,169.79,true,
 7,1996-08-11,North,survey,Yuki Sato,7.15,true,repeat visit
 8,1996-10-03,West,incident,Ana Silva,55.87,true,sensor recalibrated
 9,1996-11-01,South,survey,Omar Haddad,93.58,true,rain
@@ -199,3 +199,4 @@ id,date,site,category,observer,value,verified,notes
 198,2013-12-19,North,sample,Tom Becker,27.61,false,
 199,2014-01-16,East,incident,Ana Silva,76.71,false,sensor recalibrated
 200,2014-03-13,North,survey,Luca Bianchi,17.92,false,access road closed
+201,2021-02-11,North,survey,Edoardo Balzani,1223.9,true,new record
