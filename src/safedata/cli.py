@@ -215,28 +215,68 @@ in
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="safedata", description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(
+        prog="safedata",
+        description="Edit and check a table of records kept in a git repository.",
+        epilog="Commands work on the dataset that contains the current folder: the nearest folder\n"
+               "upwards with a safedata.toml. None of them pulls, commits or pushes; that is left\n"
+               "to git. Run `safedata <command> --help` for details on a command.",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="command", required=True, metavar="<command>")
 
-    p = sub.add_parser("edit", help="open the records editor in the browser")
+    def command(name, func, summary, description):
+        p = sub.add_parser(name, help=summary, description=description,
+                           formatter_class=argparse.RawDescriptionHelpFormatter)
+        p.set_defaults(func=func)
+        return p
+
+    p = command("edit", cmd_edit, "open the records editor in the browser", """\
+Start the records editor for the dataset containing the current folder and open
+it in the default browser. Saving in the editor validates the edits against the
+schema and writes the records file; committing it is left to git.
+The editor runs until you press Ctrl+C.""")
     p.add_argument("--port", type=int, default=0, help="port to listen on (default: any free port)")
-    p.add_argument("--no-browser", action="store_true", help="print the address without opening a browser")
-    p.set_defaults(func=cmd_edit)
-    sub.add_parser("install", help="set up the git add-ons for this copy").set_defaults(func=cmd_install)
-    p = sub.add_parser("validate", help="check the records against the schema")
-    p.add_argument("--staged", action="store_true", help="check the version staged for commit")
-    p.add_argument("--file", help="check this CSV file instead")
-    p.set_defaults(func=cmd_validate)
-    sub.add_parser("powerquery", help="print the Power Query code for Excel").set_defaults(func=cmd_powerquery)
-    sub.add_parser("normalize", help="git clean filter (stdin to stdout)").set_defaults(func=cmd_normalize)
-    p = sub.add_parser("merge-driver", help="git merge driver")
-    p.add_argument("base")
-    p.add_argument("ours")
-    p.add_argument("theirs")
-    p.add_argument("marker_size", type=int)
-    p.add_argument("path")
-    p.set_defaults(func=cmd_merge_driver)
+    p.add_argument("--no-browser", action="store_true", help="print the editor's address without opening a browser")
+
+    command("install", cmd_install, "set up the git add-ons in this clone", """\
+Configure this clone of the dataset repository to use the safedata add-ons for
+the records file: the clean filter, the merge driver, the word-diff setting
+(written to .git/config) and the check in .git/hooks/pre-commit. Settings
+in .git/ are not copied between clones, so every clone needs this once;
+`safedata edit` runs it automatically. Running it again is harmless.""")
+
+    p = command("validate", cmd_validate, "check the records against the schema", """\
+Check the records file against the schema and list every problem. Exits with
+status 1 if there are problems, 0 otherwise.""")
+    p.add_argument("--staged", action="store_true",
+                   help="check the version staged for commit instead of the file on disk "
+                        "(used by the pre-commit hook; passes when there is nothing to check)")
+    p.add_argument("--file", metavar="CSV", help="check this CSV file instead of the dataset's records file")
+
+    command("powerquery", cmd_powerquery, "print Power Query code for Excel", """\
+Print the path of the records file and the Power Query (M) code that loads it
+into an Excel table with the column types from the schema. See the dataset's
+docs/EXCEL_SETUP.md for where to paste it.""")
+
+    command("normalize", cmd_normalize, "git clean filter (called by git)", """\
+Called by git when the records file is staged, not by people. Reads the file on
+standard input and writes it to standard output sorted by the key column, with
+every value in its standard form. Input that cannot be read (wrong columns,
+merge conflict markers) is written back unchanged and left to `validate`.""")
+
+    p = command("merge-driver", cmd_merge_driver, "git merge driver (called by git)", """\
+Called by git, not by people, when a merge or pull changed the records file on
+both sides. Git passes the arguments configured in .git/config:
+    merge-driver %O %A %B %L %P
+Changes to different records, or to different columns of a record, are combined
+and written to LOCAL. Records changed differently on both sides are written as
+git conflict blocks, one record per block, and the command exits with status 1
+so git reports a conflict.""")
+    p.add_argument("base", metavar="BASE", help="%%O: temporary file with the common ancestor's version")
+    p.add_argument("ours", metavar="LOCAL", help="%%A: temporary file with this branch's version; receives the result")
+    p.add_argument("theirs", metavar="INCOMING", help="%%B: temporary file with the version being merged in")
+    p.add_argument("marker_size", metavar="MARKER_SIZE", type=int, help="%%L: length of the conflict markers (7 by default)")
+    p.add_argument("path", metavar="PATH", help="%%P: path of the records file in the repository, used in messages")
 
     args = parser.parse_args(argv)
     try:
