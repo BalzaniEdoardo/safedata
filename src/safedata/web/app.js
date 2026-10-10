@@ -219,6 +219,40 @@ function renderSummary() {
     : "no unsaved edits";
   $("save").disabled = total === 0 || invalid > 0 || pending.size > 0;
   $("discard").disabled = total === 0;
+  renderProblems();
+}
+
+// List every problem in the edited rows, so it is clear why Save is disabled.
+function renderProblems() {
+  const items = [];
+  let newIndex = 0;
+  for (const row of rows) {
+    if (row.orig === null) newIndex += 1;
+    if (!isEdited(row) || !rowHasProblems(row)) continue;
+    const label = row.orig === null ? `New record ${newIndex}` : `Record ${row.orig[state.schema.key]}`;
+    for (const c of columns()) {
+      const p = row.problems[c.name];
+      if (!p) continue;
+      const jump = Object.assign(document.createElement("button"), { className: "link", textContent: `${label}, ${c.name}` });
+      jump.onclick = () => focusCell(row, c.name);
+      const li = document.createElement("li");
+      li.append(jump, `: ${p}`);
+      items.push(li);
+    }
+  }
+  $("problems").hidden = items.length === 0;
+  $("problem-list").replaceChildren(...items);
+}
+
+function focusCell(row, name) {
+  if (!row.tr || !row.tr.isConnected) {  // the row is hidden by the filter
+    $("search").value = "";
+    $("only-changed").checked = false;
+    renderTable();
+  }
+  const input = row.cells[name]?.querySelector("input, select");
+  input?.scrollIntoView({ block: "center" });
+  input?.focus();
 }
 
 function hasUnsavedEdits() { return rows.some(isEdited); }
