@@ -5,3 +5,6 @@ __pycache__/
 
 # Excel lock files
 ~$*
+
+# idea
+.idea/
