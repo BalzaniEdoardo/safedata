@@ -1,122 +1,114 @@
 # safedata
 
-Proof of principle for a small shared dataset kept as a CSV file in a git repository. A local web editor changes the file, git records the changes, and Excel analysis workbooks read the file through Power Query.
+Tools for a small table of records kept as a CSV file in a git repository: a local web editor that validates edits and writes the file, and git add-ons that keep the file sorted, merge it record by record and check it before each commit.
 
-## Why the records are kept out of the analysis workbook
+This repository contains only the code. The records live in their own repository, which describes its columns in a `schema.yaml`. To start one, copy [template-records](https://github.com/BalzaniEdoardo/template-records); its README covers setup, editing, conflicts and the schema format.
 
-In the current setup the records and the analysis are in the same Excel file. Filtering a sheet and pasting into it can change records, and the file keeps no record of who changed what or when.
+## What the tool does and does not do
 
-## Who does what
-
-Each part has one job.
+Each part has one job:
 
 | Part | Job | Does not |
 |---|---|---|
-| Editor (`safedata edit`) | shows the records as a table, validates edits, writes `data/records.csv` | pull, commit, push, or keep any history |
-| git, with any git client | pull, diff, commit, push, history, merges | |
-| git add-ons (`safedata install`) | keep `records.csv` sorted, merge it record by record, check it before each commit | replace any git command |
-| Analysis workbooks | read `records.csv` through Power Query | write to the records |
+| `safedata edit` | shows the records as a table, validates edits against the schema, writes the records file | pull, commit, push or keep any history |
+| git add-ons | sort the records file when staged, merge it record by record, mark changed cells in word diffs, reject invalid commits | replace any git command |
+| git, with any git client | pull, diff, commit, push, history | |
 
-Because the history is plain git, any git client can show it: the command line, GitHub Desktop, VS Code, GitKraken, the web page of the git server, and so on.
+Everything that involves history (reviewing, committing, merging, browsing past versions) is done with git, so any git client works.
 
-## Editing records
+## Installing
 
-1. Get the latest commits (`git pull`, or the client's pull/sync button).
-2. Start the editor: run `safedata edit` inside the dataset folder. It opens a tab in the default browser. Keep the terminal window open while editing.
-3. Edit the table. Each column has an input that matches its type: dropdowns for choices and true/false, a date picker for dates. Edited cells are highlighted, and cells with a problem are outlined in red. *Add record* adds a row, and the record number is assigned on save. *Delete* marks a row for deletion until you save.
-4. Click **Save to records.csv**. The editor checks every edit against `data/schema.yaml` and writes the file. If a check fails, nothing is written and the problems are listed.
-
-After saving, `data/records.csv` shows as modified in git. Below the table, the editor lists which records differ from the last commit.
-
-## Recording changes in git
-
-The steps are ordinary git; use whichever client you prefer.
+Requires [git](https://git-scm.com) and [uv](https://docs.astral.sh/uv/).
 
 ```sh
-git diff data/records.csv               # review: one changed line per changed record
-git diff --word-diff data/records.csv   # the same, with the changed cells marked
-git commit -m "Add March samples" data/records.csv
-git push
+uv tool install git+https://github.com/BalzaniEdoardo/safedata
 ```
 
-When `records.csv` is staged, the git add-ons sort and normalize it, then check it against the schema. A file that fails the check cannot be committed, whichever client is used.
-
-## Viewing the history
+This puts a `safedata` command on the PATH, in an environment of its own. For development, install from a local clone instead; `--editable` makes code changes take effect without reinstalling:
 
 ```sh
-git log -p --word-diff data/records.csv    # every change, cell by cell
-git log -L '/^42,/,+1:data/records.csv'    # the history of record 42
-git blame data/records.csv                 # last commit to touch each record
+uv tool install --editable ~/Code/safedata
 ```
 
-Graphical clients show the same history in their file-history views.
+## Commands
 
-## The git add-ons
+Every command works on the dataset containing the current folder: the nearest folder upwards with a `safedata.toml`, the way git finds `.git`. Outside a dataset folder, commands stop with an error.
 
-`safedata install` configures them for one copy of the repository. The editor runs it on start, so nobody has to remember. `.gitattributes` applies them to `data/records.csv`.
+| Command | What it does |
+|---|---|
+| `safedata edit` | opens the editor in the default browser; stop it with Ctrl+C |
+| `safedata install` | configures the git add-ons in this clone (also run by `edit`) |
+| `safedata validate` | checks the records file against the schema (`--staged` checks the version staged for commit) |
+| `safedata powerquery` | prints Power Query code for loading the records in Excel, generated from the schema |
+| `safedata normalize` | the git clean filter: reads the file on stdin, writes it sorted and normalized |
+| `safedata merge-driver` | the git merge driver |
 
-- **Clean filter**: when the file is staged, it sorts rows by `id` and writes values in one form (dates as `YYYY-MM-DD`, `true`/`false`, one number format, LF line endings). Diffs then contain only changed values, whatever program last wrote the file.
-- **Merge driver**: merges by record and by field. Edits to different records, or to different fields of one record, are combined. When two people add records at the same time, both are kept and the second gets the next free `id`. A field changed differently on both sides, or a record edited on one side and deleted on the other, becomes a standard git conflict with one record per conflict block.
-- **Word diff**: `git diff --word-diff` and `git log -p --word-diff` mark the changed cells inside a line.
-- **Pre-commit hook**: runs `safedata validate --staged`, which rejects schema errors and unresolved conflict markers.
+The last two are called by git, not by people.
 
-The same validation runs in CI (`.github/workflows/validate.yml`), so a commit made without the hooks is still checked.
-
-## Resolving a merge conflict in records.csv
-
-After a pull or merge that conflicts, `records.csv` contains standard git conflict markers. Each block holds the two versions of one record:
-
-```
-<<<<<<< local
-12,2020-01-01,North,survey,Maria,7,true,
-=======
-12,2020-01-01,North,survey,Maria,8,true,
->>>>>>> incoming
-```
-
-There are two ways to resolve it:
-
-- in any git client's conflict view, or in a text editor, by keeping one line per block;
-- in the records editor, which detects the markers and shows both versions of each record with the differing cells highlighted. Choose one version per record, then click *Write resolved records.csv*.
-
-Then stage `data/records.csv` and commit the merge, as for any git conflict.
-
-## Setting up a copy
-
-Each machine needs [git](https://git-scm.com) and [uv](https://docs.astral.sh/uv/). On first run, uv installs Python and the dependencies.
-
-```sh
-git clone https://example.org/team/records.git records   # copy the repository into a folder named "records"
-cd records
-uv run safedata install     # first run creates .venv; then configures the git add-ons for this clone
-uv run safedata validate    # check the records against the schema
-uv run pytest               # tests
-```
-
-Replace the URL with the address of your shared repository (a web address, an SSH address, or a path such as `/Volumes/shared/records.git`). The add-on settings are stored in the clone's `.git/config` and `.git/hooks`, which git does not copy between clones, so every clone needs `safedata install` once. `safedata edit` runs it automatically.
-
-The shared repository can be on any git host: a private GitHub or GitLab repository, a self-hosted Forgejo server, or a bare repository on a network drive.
-
-## Analysis in Excel
-
-[docs/EXCEL_SETUP.md](docs/EXCEL_SETUP.md) describes connecting an analysis workbook with Power Query. `uv run safedata powerquery` prints the query code, generated from the schema. Python users can call `safedata.load()` to get a pandas DataFrame with typed columns.
-
-## Changing the schema
-
-Edit `data/schema.yaml`. If you add a column, add it to `records.csv` as well, and commit both files together. Then ask the analysts to paste the new output of `safedata powerquery` into their query.
-
-The editor reads the schema when it loads: it builds each column's input from it and sends edited cells to `schema.py` for checking. A new or changed column needs no change in the editor code.
-
-## Repository layout
+## A dataset folder
 
 ```
-data/records.csv        the records (canonical CSV)
-data/schema.yaml        column definitions and rules
-src/safedata/           schema, store, changeset, merge, webapp (editor), cli; web/ holds the page
-docs/EXCEL_SETUP.md     connecting an analysis workbook
+safedata.toml       records = "data/records.csv"
+                    schema = "data/schema.yaml"
+data/records.csv
+data/schema.yaml
+.gitattributes      data/records.csv  filter=safedata merge=safedata diff=safedata text eol=lf
+```
+
+`safedata.toml` marks the folder and gives the two paths relative to it. `.gitattributes` assigns the add-ons to the records file. `safedata install` defines what the add-on names mean, in the clone's `.git/config`, which git does not copy between clones:
+
+```ini
+[filter "safedata"]
+    clean = "<tool python>" -m safedata normalize
+[merge "safedata"]
+    driver = "<tool python>" -m safedata merge-driver %O %A %B %L %P
+[diff "safedata"]
+    wordRegex = [^,]+
+```
+
+It also writes `.git/hooks/pre-commit`, which runs `safedata validate --staged`. In a clone without these settings, git ignores the attributes and treats the records file as plain text.
+
+## How the git add-ons behave
+
+- **Clean filter.** When the records file is staged, rows are sorted by the key column and every value is written in one form: dates as `YYYY-MM-DD`, booleans as `true`/`false`, one number format, UTF-8, LF line endings. A diff then contains only changed values, whichever program last wrote the file. A file that cannot be read, or that contains conflict markers, passes through unchanged and is left to validation.
+- **Merge driver.** Merges by record and by column. Changes to different records, or to different columns of one record, are combined. Records added on both sides are both kept, and the incoming one is renumbered if its number is taken. A column changed differently on both sides, or a record edited on one side and deleted on the other, is written as a standard git conflict block containing the two versions of that record, and the driver prints which records are affected and how to resolve them.
+- **Word diff.** `git diff --word-diff` treats each cell as a word, so changed cells are marked inside a line.
+- **Pre-commit hook.** Rejects a staged records file that breaks the schema, is not in normalized form, or still contains conflict markers, and lists the problems.
+
+## The editor
+
+`safedata edit` starts a server on 127.0.0.1 on a free port and opens the page. Requests for data must carry a random token that is only in the page address, so other web pages cannot read or change the records.
+
+- The page builds each column's input from the schema (dropdown, date picker, text) and sends edited cells to the server for checking, so all rules live in `schema.py`.
+- **Save** sends the edits as a changeset: the old and new value of each changed cell, plus added and deleted records. The server applies each change only if the file still holds the old value, so edits saved after the file changed on disk (for example after a `git pull`) cannot silently overwrite someone else's change. It then validates the whole table and writes the file.
+- If the records file contains conflict markers, the page shows both versions of each conflicting record and writes the file with the chosen ones. Staging the file and committing the merge are left to git.
+- The page also shows, read-only, the git branch and which records differ from the last commit.
+
+## Code layout
+
+```
+src/safedata/
+  schema.py      loading schema.yaml; value normalization; validation; input specs for editors
+  store.py       reading and writing the canonical CSV; reading and writing conflict blocks
+  changeset.py   changes between two versions of the records; applying them with conflict checks
+  merge.py       three-way merge of two versions, used by the merge driver
+  dataset.py     finding the dataset folder from safedata.toml
+  webapp.py      the editor's HTTP server
+  web/           the editor page (HTML, JavaScript, CSS)
+  gitops.py      read-only git queries, and the config writes done by install
+  cli.py         the commands
 tests/
+  fixtures/schema.yaml   the schema used by the tests
 ```
 
-## Adding another editor
+Another editor can reuse the same core: it has to produce a `Changeset` relative to the version it started from, then `changeset.apply`, `schema.validate` and `store.write_file` do the rest.
 
-An editor has to do one thing: turn a person's edits into a valid `records.csv`. `changeset.apply` applies a list of edits to the current records and reports edits that clash with changes made on disk in the meantime. `schema.validate` checks the result, and `store.write_file` writes it in canonical form.
+## Development
+
+```sh
+git clone https://github.com/BalzaniEdoardo/safedata
+cd safedata
+uv run pytest
+```
+
+`uv run` creates the project environment on first use. CI runs the same tests (`.github/workflows/tests.yml`).

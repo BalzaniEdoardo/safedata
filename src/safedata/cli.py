@@ -136,15 +136,22 @@ def cmd_merge_driver(args) -> int:
 
 
 def cmd_validate(args) -> int:
-    ds = dataset.find()
-    schema = ds.load_schema()
     if args.staged:
+        # Run by the pre-commit hook: block only a commit that stages an invalid records
+        # file. Outside a dataset, or when the records file is not in the index (never
+        # added, or being deleted), there is nothing to check.
+        try:
+            ds = dataset.find()
+        except dataset.DatasetNotFound:
+            return 0
         if not gitops.git("ls-files", "--", ds.records, cwd=ds.root).strip():
             return 0
         text, where = gitops.show(ds.root, "", f"./{ds.records}"), f"{ds.records} (staged)"
     else:
+        ds = dataset.find()
         path = Path(args.file) if args.file else ds.records_path
         text, where = path.read_text(encoding="utf-8"), str(path)
+    schema = ds.load_schema()
 
     rows: list = []
     if store.has_conflicts(text):  # checked first: a conflicted file does not parse as CSV
@@ -228,6 +235,9 @@ def main(argv: list[str] | None = None) -> int:
     except dataset.DatasetNotFound as e:
         print(f"safedata: not inside a dataset folder ({e}).\n"
               "cd into your records folder and run the command again.", file=sys.stderr)
+        return 1
+    except dataset.DatasetError as e:
+        print(f"safedata: {e}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         return 130

@@ -21,8 +21,12 @@ from .schema import Schema, load_schema
 MARKER = "safedata.toml"
 
 
-class DatasetNotFound(Exception):
-    pass
+class DatasetError(Exception):
+    """A dataset folder was found, but it is incomplete or cannot be read."""
+
+
+class DatasetNotFound(DatasetError):
+    """No safedata.toml in the folder or any folder above it."""
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,8 @@ class Dataset:
         return self.root / self.schema
 
     def load_schema(self) -> Schema:
+        if not self.schema_path.is_file():
+            raise DatasetError(f"the schema file {self.schema_path} (set in {MARKER}) does not exist")
         return load_schema(self.schema_path)
 
 
