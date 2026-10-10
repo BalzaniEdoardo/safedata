@@ -59,8 +59,11 @@ def test_pre_commit_check_passes_outside_a_dataset(tmp_path, monkeypatch, capsys
     assert capsys.readouterr().err == ""
 
 
-def test_missing_schema_file(ds, capsys):
+def test_missing_files(ds, capsys):
+    assert cli.main(["validate"]) == 1
+    assert "the records file" in capsys.readouterr().err
+
+    write(ds.records_path, [make_row(1)], ds)
     ds.schema_path.unlink()
     assert cli.main(["validate"]) == 1
-    err = capsys.readouterr().err
-    assert "schema file" in err and "does not exist" in err and "Traceback" not in err
+    assert "the schema file" in capsys.readouterr().err

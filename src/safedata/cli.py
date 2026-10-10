@@ -150,6 +150,8 @@ def cmd_validate(args) -> int:
     else:
         ds = dataset.find()
         path = Path(args.file) if args.file else ds.records_path
+        if not path.is_file():
+            raise dataset.DatasetError(f"the records file {path} does not exist")
         text, where = path.read_text(encoding="utf-8"), str(path)
     schema = ds.load_schema()
 
