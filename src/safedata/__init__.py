@@ -1,4 +1,4 @@
-"""safedata: version-controlled records with friendly editing."""
+"""safedata: records kept in git, edited through Excel sheets, read by analysis workbooks."""
 
 from __future__ import annotations
 

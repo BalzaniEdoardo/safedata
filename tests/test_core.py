@@ -59,11 +59,11 @@ def test_normalization_is_deterministic(schema):
     shuffled = store.to_text(rows, schema)
     assert shuffled == reference
     assert store.normalize_text(reference, schema) == reference
-    # Excel-style: BOM, CRLF, reordered columns
+    # as saved by Excel: byte-order mark and CRLF line endings
     messy = "﻿" + reference.replace("\n", "\r\n")
     assert store.normalize_text(messy, schema) == reference
     lines = reference.splitlines()
-    assert lines[1].startswith("1,") and lines[10].startswith("10,")  # numeric, not text, order
+    assert lines[1].startswith("1,") and lines[10].startswith("10,")  # sorted as numbers: 10 after 9
 
 
 def test_normalize_passes_through_garbage(schema):

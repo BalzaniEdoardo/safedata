@@ -27,7 +27,7 @@ CONFLICT_FILE = "MERGE_CONFLICTS.txt"
 
 
 class Abort(Exception):
-    """Stop with a friendly message (no traceback)."""
+    """Stop and show the message to the user, without a traceback."""
 
 
 # ---------------------------------------------------------------- git plumbing

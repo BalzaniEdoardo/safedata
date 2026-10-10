@@ -1,7 +1,7 @@
 [project]
 name = "safedata"
 version = "0.1.0"
-description = "Version-controlled records with friendly editing and Excel-based analysis"
+description = "Records kept in git, edited through Excel sheets, read by analysis workbooks"
 requires-python = ">=3.10"
 dependencies = [
     "openpyxl>=3.1",

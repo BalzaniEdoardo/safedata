@@ -1,9 +1,9 @@
-"""Changesets: the one format every editing front-end produces.
+"""Changesets: the format that every editing tool produces.
 
-A changeset records *what someone changed relative to the version they started
-from*. Applying it to the current records checks each change against what is
-there now, so edits made by other people in the meantime are never overwritten
-silently: they either combine cleanly or come back as conflicts.
+A changeset lists the changes one person made relative to the version they
+started from. Applying it compares each change with the current records: if
+someone else changed the same value in the meantime, the change is reported as
+a conflict and the current value is kept.
 """
 
 from __future__ import annotations

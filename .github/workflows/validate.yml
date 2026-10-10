@@ -12,5 +12,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Check records against the schema
         run: uv run safedata validate
+      - name: Check writing rules in docs, comments and docstrings
+        run: python3 tools/style/check.py
       - name: Run tests
         run: uv run pytest -q

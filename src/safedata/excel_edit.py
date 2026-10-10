@@ -24,10 +24,10 @@ SPARE_ROWS = 1000  # rows below the data that still get dropdowns and checks
 HELP_TEXT = [
     "How to edit the records",
     "",
-    "Change a value: just type over it in the Records sheet.",
+    "Change a value: type over it in the Records sheet.",
     "Add a record: fill in an empty row at the bottom and leave the id blank. It gets a number when you submit.",
     "Delete a record: choose 'delete' in the _action column of that row. Removing the row does NOT delete it.",
-    "Sorting and filtering this sheet is fine; nothing is lost.",
+    "Sorting and filtering this sheet does not change what gets submitted.",
     "Do not change the id column.",
     "",
     "When you are done: save and close this file, then double-click 'submit'.",
