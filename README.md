@@ -66,7 +66,7 @@ data/schema.yaml
     wordRegex = [^,]+
 ```
 
-It also writes `.git/hooks/pre-commit`, which runs `safedata validate --staged`. In a clone without these settings, git ignores the attributes and treats the records file as plain text.
+It also adds `safedata validate --staged` to `.git/hooks/pre-commit`, inside a block marked `# >>> safedata >>>` / `# <<< safedata <<<`. Running `install` again replaces only that block, and the rest of an existing hook is kept. In an existing shell hook the block goes right after the first line, so it runs even if the hook ends with `exec`. A hook in another language is left unchanged, and `install` prints the line to add to it. In a clone without these settings, git ignores the attributes and treats the records file as plain text.
 
 ## How the git add-ons behave
 
