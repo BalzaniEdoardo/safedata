@@ -19,7 +19,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from . import dataset, gitops, store
+from . import dataset, gitops, hooks, store
 from .merge import merge
 from .schema import validate
 from .webapp import serve
@@ -73,11 +73,18 @@ def install(root: Path) -> None:
     gitops.set_config(root, "merge.safedata.name", "safedata record-level merge")
     gitops.set_config(root, "merge.safedata.driver", f'"{py}" -m safedata merge-driver %O %A %B %L %P')
     gitops.set_config(root, "diff.safedata.wordRegex", "[^,]+")
-    hooks = root / gitops.git("rev-parse", "--git-path", "hooks", cwd=root).strip()
-    hooks.mkdir(parents=True, exist_ok=True)
-    hook = hooks / "pre-commit"
-    hook.write_text(f'#!/bin/sh\nexec "{py}" -m safedata validate --staged\n', encoding="utf-8", newline="\n")
-    hook.chmod(0o755)
+    hooks_dir = root / gitops.git("rev-parse", "--git-path", "hooks", cwd=root).strip()
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook = hooks_dir / "pre-commit"
+    existing = hook.read_text(encoding="utf-8") if hook.is_file() else None
+    try:
+        updated = hooks.update_pre_commit(existing, py)
+    except hooks.ForeignHook as e:
+        print(f"safedata: {e}", file=sys.stderr)
+        return
+    if updated != existing:
+        hook.write_text(updated, encoding="utf-8", newline="\n")
+    hook.chmod(hook.stat().st_mode | 0o111)  # keep existing permissions, ensure it can run
 
 
 def ensure_installed(root: Path) -> None:
