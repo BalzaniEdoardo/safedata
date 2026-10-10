@@ -1,5 +1,0 @@
-# records.csv is sorted and normalized when staged (filter), merged record by
-# record (merge), and shows changed cells with `git diff --word-diff` (diff).
-# The three drivers are configured per copy by `safedata install`, which the
-# editor also runs on start.
-data/records.csv  filter=safedata merge=safedata diff=safedata text eol=lf
