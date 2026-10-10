@@ -86,11 +86,14 @@ Then stage `data/records.csv` and commit the merge, as for any git conflict.
 Each machine needs [git](https://git-scm.com) and [uv](https://docs.astral.sh/uv/). On first run, uv installs Python and the dependencies.
 
 ```sh
-git clone <shared-repo> records && cd records
-uv run safedata install     # git add-ons for this copy (the editor also runs it)
+git clone https://example.org/team/records.git records   # copy the repository into a folder named "records"
+cd records
+uv run safedata install     # first run creates .venv; then configures the git add-ons for this clone
 uv run safedata validate    # check the records against the schema
 uv run pytest               # tests
 ```
+
+Replace the URL with the address of your shared repository (a web address, an SSH address, or a path such as `/Volumes/shared/records.git`). The add-on settings are stored in the clone's `.git/config` and `.git/hooks`, which git does not copy between clones, so every clone needs `safedata install` once. `safedata edit` runs it automatically.
 
 The shared repository can be on any git host: a private GitHub or GitLab repository, a self-hosted Forgejo server, or a bare repository on a network drive.
 
@@ -104,21 +107,6 @@ Edit `data/schema.yaml`. If you add a column, add it to `records.csv` as well, a
 
 The editor reads the schema when it loads: it builds each column's input from it and sends edited cells to `schema.py` for checking. A new or changed column needs no change in the editor code.
 
-## Writing rules for docs, comments and docstrings
-
-`tools/style/rules.txt` lists phrasing that is not allowed in this repository. `tools/style/check.py` enforces it.
-
-- **Hard rules** always fail. Examples: filler openers, marketing vocabulary, and headings that do not say what the section contains.
-- **Soft rules** cover phrases that also have ordinary literal uses, such as `pay for`. The command line prints them as warnings. Put `style: allow` on the line to accept a literal use.
-- **Markdown** paragraphs and list items must each be on a single line.
-
-The check reads markdown text outside code blocks. In Python it reads comments, docstrings and string literals, not code. It runs in four places:
-
-- in CI;
-- with `python3 tools/style/check.py` (add `--changed` for uncommitted files only, or `--strict` to fail on soft matches too);
-- as a Claude Code hook before every file write (`.claude/settings.json`);
-- as a Claude Code check at the end of each turn, which catches files written through the shell.
-
 ## Repository layout
 
 ```
@@ -127,7 +115,6 @@ data/schema.yaml        column definitions and rules
 src/safedata/           schema, store, changeset, merge, webapp (editor), cli; web/ holds the page
 launchers/              double-click wrappers for the editor
 docs/EXCEL_SETUP.md     connecting an analysis workbook
-tools/style/            writing rules and their checker
 tests/
 ```
 
