@@ -3,11 +3,5 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
-# Personal editing workbooks and their archive
-edits/
-
-# Written by the merge driver when two changes clash
-MERGE_CONFLICTS.txt
-
 # Excel lock files
 ~$*

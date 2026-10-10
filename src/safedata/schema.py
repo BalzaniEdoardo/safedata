@@ -158,6 +158,8 @@ def is_valid_value(value: str, col: Column) -> str | None:
     """Return None if a canonical value is acceptable, else a short reason."""
     if value == "":
         return "is required" if col.required else None
+    if "\n" in value or "\r" in value:
+        return "contains a line break"
     t = col.type
     if t == "int":
         try:
@@ -191,6 +193,26 @@ def is_valid_value(value: str, col: Column) -> str | None:
     if col.max is not None and num > _typed(col.max, t):
         return f"{value} is above the maximum {col.max}"
     return None
+
+
+def input_spec(col: Column) -> dict:
+    """How an editor should present and sort a column. Editors build their inputs
+    from this, so a new column or type needs no change in the editor code."""
+    sort = "number" if col.type in ("int", "float") else "text"  # ISO dates sort as text
+    if col.type == "choice":
+        return {"kind": "select", "options": col.choices, "sort": sort}
+    if col.type == "bool":
+        return {"kind": "select", "options": ["true", "false"], "sort": sort}
+    if col.type == "date":
+        return {"kind": "date", "min": col.min, "max": col.max, "sort": sort}
+    if col.type in ("int", "float"):
+        return {"kind": "text", "inputmode": "numeric" if col.type == "int" else "decimal", "sort": sort}
+    return {"kind": "text", "sort": sort}
+
+
+def check_value(value, col: Column) -> str | None:
+    """Validate one raw value as an editor would submit it."""
+    return is_valid_value(canon(value, col), col)
 
 
 def _typed(value: str, t: str):

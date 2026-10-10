@@ -1,6 +1,5 @@
 @echo off
-rem Open the records for editing. Double-click to run.
+rem Opens the records editor in the browser. Keep this window open while editing.
 cd /d "%~dp0.."
 uv run safedata edit
-echo.
 pause

@@ -6,6 +6,7 @@ from conftest import make_row
 from safedata import store
 from safedata.changeset import apply, diff
 from safedata.merge import merge
+from safedata.store import has_conflicts, parse_conflicted, to_text_with_conflicts
 from safedata.schema import canon, validate
 
 
@@ -111,14 +112,15 @@ def test_merge_same_record_different_fields(schema):
     assert r.rows[0]["value"] == "10" and r.rows[0]["notes"] == "checked"
 
 
-def test_merge_same_field_conflicts_and_keeps_ours(schema):
-    ours = [make_row(1, value="10"), make_row(2), make_row(3)]
-    theirs = [make_row(1, value="20"), make_row(2), make_row(3)]
+def test_merge_same_field_conflicts(schema):
+    ours = [make_row(1, value="10", notes="a"), make_row(2), make_row(3)]
+    theirs = [make_row(1, value="20", observer="Luca"), make_row(2), make_row(3)]
     r = merge(BASE, ours, theirs, schema)
-    assert len(r.conflicts) == 1
-    c = r.conflicts[0]
-    assert (c.key, c.column, c.base, c.ours, c.theirs) == ("1", "value", "1.5", "10", "20")
-    assert r.rows[0]["value"] == "10"
+    assert list(r.conflicts) == ["1"]
+    local, incoming = r.conflicts["1"]
+    # both versions carry the fields that merged cleanly; they differ only in `value`
+    assert local == make_row(1, value="10", notes="a", observer="Luca")
+    assert incoming == make_row(1, value="20", notes="a", observer="Luca")
 
 
 def test_merge_same_change_on_both_sides(schema):
@@ -140,14 +142,41 @@ def test_merge_delete_vs_edit_conflicts(schema):
     ours = [make_row(1), make_row(3)]                       # deleted 2
     theirs = [make_row(1), make_row(2, value="7"), make_row(3)]  # edited 2
     r = merge(BASE, ours, theirs, schema)
-    assert len(r.conflicts) == 1 and "deleted" in r.conflicts[0].reason
+    assert r.conflicts == {"2": (None, make_row(2, value="7"))}
 
     r = merge(BASE, theirs, ours, schema)  # the other way round
-    assert len(r.conflicts) == 1 and "kept" in r.conflicts[0].reason
-    assert [x["id"] for x in r.rows] == ["1", "2", "3"]
+    assert r.conflicts == {"2": (make_row(2, value="7"), None)}
 
 
 def test_merge_delete_on_both_sides(schema):
     ours = [make_row(1), make_row(3)]
     r = merge(BASE, ours, ours, schema)
     assert not r.conflicts and [x["id"] for x in r.rows] == ["1", "3"]
+
+
+# ---------------------------------------------------------------- conflict markers
+
+def test_conflict_markers_roundtrip(schema):
+    rows = [make_row(1), make_row(3)]
+    pairs = {"2": (make_row(2, value="7"), make_row(2, value="8")), "4": (None, make_row(4))}
+    text = to_text_with_conflicts(rows, pairs, schema)
+    lines = text.splitlines()
+    assert lines[2:7] == ["<<<<<<< local", store.to_text([make_row(2, value="7")], schema).splitlines()[1],
+                          "=======", store.to_text([make_row(2, value="8")], schema).splitlines()[1],
+                          ">>>>>>> incoming"]
+    assert has_conflicts(text)
+    assert store.normalize_text(text, schema) == text  # the clean filter leaves conflicts alone
+    clean, parsed = parse_conflicted(text, schema)
+    assert [r["id"] for r in clean] == ["1", "3"]
+    assert parsed == pairs
+
+
+def test_parse_line_based_git_conflict(schema):
+    """Conflicts written by plain git (no merge driver) can span several records."""
+    header = store.to_text([], schema)
+    line = lambda **kw: store.to_text([make_row(**kw)], schema).splitlines()[1]
+    text = (header + line(id=1) + "\n<<<<<<< HEAD\n" + line(id=2, value="7") + "\n" + line(id=3) + "\n"
+            "||||||| base\n" + line(id=2) + "\n=======\n" + line(id=2, value="8") + "\n>>>>>>> other\n")
+    clean, pairs = parse_conflicted(text, schema)
+    assert [r["id"] for r in clean] == ["1"]
+    assert pairs == {"2": (make_row(2, value="7"), make_row(2, value="8")), "3": (make_row(3), None)}

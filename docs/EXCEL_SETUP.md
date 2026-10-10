@@ -2,7 +2,7 @@
 
 An analysis workbook holds a read-only copy of the records in one sheet, loaded with Power Query. Filters, sort order, formulas, pivots and charts go on or next to that sheet. **Data > Refresh All** reloads the records and re-applies the filter and sort order.
 
-The analysis workbook can be saved anywhere, including outside the records folder. The edit, submit and update launchers never open or change it.
+The analysis workbook can be saved anywhere, including outside the records folder. Neither git nor the records editor opens or changes it.
 
 Requirements: Microsoft 365 Excel on Windows, or on Mac version 16.69 or later.
 
@@ -19,16 +19,18 @@ If Excel reports a *Formula.Firewall* or privacy-level error, open *Data > Get D
 
 ## Loading the latest records
 
-1. Double-click **update** in the `launchers` folder of the records folder.
+1. Get the latest commits into the records folder (`git pull`, or the pull/sync button of your git client).
 2. In Excel, click **Data > Refresh All**.
 
 Filters, sort order, formulas, pivots and charts are unchanged after the refresh.
+
+The query reads the `records.csv` file in your copy of the repository as it is on disk. Edits saved in the records editor but not yet committed are included, and so is any checked-out branch. To analyse only committed records, refresh when `git status` shows no changes to `data/records.csv`.
 
 ## Formulas and pivots that keep working when rows are added
 
 - **Refer to table columns, not cell ranges.** `=AVERAGEIFS(Records[value], Records[site], "North")` includes new rows after a refresh. `=AVERAGE(G2:G201)` does not.
 - **Add calculated columns inside the table.** A formula column added at the right edge of the `Records` table, such as `=[@value]*2`, is filled in for new rows on each refresh.
-- **Do not type values into the `Records` sheet.** The next refresh overwrites them. Use **edit** and **submit** to change records.
+- **Do not type values into the `Records` sheet.** The next refresh overwrites them. Change records in the records editor.
 - **Base pivot tables on the `Records` table.** *Refresh All* updates them together with the table.
 - **After a schema change, replace the query code.** When the maintainer adds or renames a column, run `safedata powerquery` again and paste the new code into the Advanced Editor.
 

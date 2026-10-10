@@ -1,10 +1,9 @@
 [project]
 name = "safedata"
 version = "0.1.0"
-description = "Records kept in git, edited through Excel sheets, read by analysis workbooks"
+description = "Records in a git repository: a validating editor, git add-ons, and Excel analysis via Power Query"
 requires-python = ">=3.10"
 dependencies = [
-    "openpyxl>=3.1",
     "pandas>=2.0",
     "pyyaml>=6.0",
 ]

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Records editor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Records editor <span id="file"></span></h1>
+    <div id="gitinfo"></div>
+  </header>
+
+  <div id="message" hidden></div>
+
+  <section id="editor" hidden>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Filter rows (any column)">
+      <label><input id="only-changed" type="checkbox"> Only edited rows</label>
+      <button id="add">Add record</button>
+      <span id="summary"></span>
+      <button id="discard">Discard edits</button>
+      <button id="save" class="primary">Save to records.csv</button>
+    </div>
+    <div class="table-wrap"><table id="table"><thead></thead><tbody></tbody></table></div>
+    <p class="hint">Click a column title to sort. Edited cells are highlighted; cells with a problem are outlined in red (hover for details). Saving writes <code>data/records.csv</code> and nothing else.</p>
+  </section>
+
+  <section id="uncommitted" hidden>
+    <h2>Saved but not yet committed</h2>
+    <p>These records in <code>data/records.csv</code> differ from the last commit. Review and commit the file with your git tool to add them to the history.</p>
+    <ul id="uncommitted-list"></ul>
+  </section>
+
+  <section id="conflicts" hidden>
+    <h2>Merge conflicts in records.csv</h2>
+    <p>The last <code>git pull</code> or merge changed some records both here and in the incoming commits. Choose one version of each record, then write the file. Afterwards, mark <code>data/records.csv</code> as resolved in your git tool (stage it) and commit the merge.</p>
+    <div id="conflict-list"></div>
+    <button id="resolve" class="primary" disabled>Write resolved records.csv</button>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

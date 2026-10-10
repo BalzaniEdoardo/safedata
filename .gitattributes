@@ -1,7 +1,8 @@
-# Records are normalized (sorted, canonical values) whenever they are staged,
-# and merged record by record instead of line by line.
-# Both drivers are set up per copy by `safedata install` (run automatically by the launchers).
-data/records.csv  filter=safedata merge=safedata text eol=lf
+# records.csv is sorted and normalized when staged (filter), merged record by
+# record (merge), and shows changed cells with `git diff --word-diff` (diff).
+# The three drivers are configured per copy by `safedata install`, which the
+# editor also runs on start.
+data/records.csv  filter=safedata merge=safedata diff=safedata text eol=lf
 
 *.cmd     text eol=crlf
 *.command text eol=lf

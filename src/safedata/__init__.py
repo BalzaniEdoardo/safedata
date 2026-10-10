@@ -1,4 +1,4 @@
-"""safedata: records kept in git, edited through Excel sheets, read by analysis workbooks."""
+"""safedata: records in a git repository, with a validating editor and git add-ons."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ def load(repo: str | Path = "."):
     import pandas as pd
 
     from . import gitops
-    from .cli import DATA_FILE, SCHEMA_FILE
+    from .webapp import DATA_FILE, SCHEMA_FILE
     from .schema import load_schema
 
     root = gitops.repo_root(repo)

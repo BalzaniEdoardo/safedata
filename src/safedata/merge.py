@@ -2,29 +2,37 @@
 
 from __future__ import annotations
 
-from .changeset import ApplyResult, apply, diff
+from dataclasses import dataclass
+
+from .changeset import apply, diff
 from .schema import Schema
-from .store import Rows
+from .store import Pair, Rows, canonical_rows, index
 
 
-def merge(base: Rows, ours: Rows, theirs: Rows, schema: Schema) -> ApplyResult:
+@dataclass
+class MergeResult:
+    rows: Rows                  # merged records; for conflicting keys, the local version
+    conflicts: dict[str, Pair]  # key -> (local record, incoming record); None = deleted
+    notes: list[str]
+
+
+def merge(base: Rows, ours: Rows, theirs: Rows, schema: Schema) -> MergeResult:
     """Combine `theirs` into `ours`, both descending from `base`.
 
-    Changes to different records, or to different fields of one record, combine
-    automatically. When both sides changed the same field differently, `ours`
-    is kept and a conflict is reported.
+    Changes to different records, or to different fields of one record, are
+    combined. Where both sides changed the same field differently, or one side
+    edited a record the other deleted, the record is returned as a conflict.
     """
-    return apply(ours, diff(base, theirs, schema), schema)
-
-
-def conflict_report(result: ApplyResult, path: str = "") -> str:
-    lines = [
-        f"Conflicting changes in {path or 'the records'}.",
-        "Both sides changed the same thing. The local value was kept for each item below;",
-        "decide which value is right, fix the file, then finish the merge.",
-        "",
-    ]
-    lines += [f"  - {c.describe()}" for c in result.conflicts]
-    if result.notes:
-        lines += ["", "Also:"] + [f"  - {n}" for n in result.notes]
-    return "\n".join(lines) + "\n"
+    result = apply(ours, diff(base, theirs, schema), schema)
+    merged = index(result.rows, schema)
+    theirs_ix = index(canonical_rows(theirs, schema), schema)
+    conflicts: dict[str, Pair] = {}
+    for c in result.conflicts:
+        if c.column == "*":
+            conflicts[c.key] = (merged.get(c.key), theirs_ix.get(c.key))
+        else:
+            local = merged[c.key]
+            incoming = dict(conflicts.get(c.key, (local, local))[1])
+            incoming[c.column] = c.theirs
+            conflicts[c.key] = (local, incoming)
+    return MergeResult(result.rows, conflicts, result.notes)
