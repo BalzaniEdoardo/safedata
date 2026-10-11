@@ -10,7 +10,6 @@ personal git settings do not affect them. Marked `git`: deselect with
 `pytest -m "not git"`.
 """
 
-import os
 import shutil
 import subprocess
 from types import SimpleNamespace
@@ -58,9 +57,11 @@ def commit(repo, message):
 def team(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
+    (home / ".gitconfig").write_text("")  # an empty file, not os.devnull, which is "nul" on Windows
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("USERPROFILE", str(home))  # the home folder on Windows
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(home / ".gitconfig"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")  # also skips Git for Windows' system core.autocrlf
 
     server = tmp_path / "server.git"
     git(tmp_path, "init", "-q", "--bare", "-b", "main", str(server))
