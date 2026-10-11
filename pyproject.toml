@@ -14,6 +14,12 @@ safedata = "safedata.cli:main"
 [dependency-groups]
 dev = ["pytest>=8"]
 
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+    "git: end-to-end tests that create throwaway git repositories and commit, merge and push in them (deselect with -m 'not git')",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

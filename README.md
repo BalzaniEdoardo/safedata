@@ -112,3 +112,5 @@ uv run pytest
 ```
 
 `uv run` creates the project environment on first use. CI runs the same tests (`.github/workflows/tests.yml`).
+
+`tests/test_git_e2e.py` checks the editor and the git add-ons end to end. It creates a bare repository and two clones in a temporary folder, and commits, merges and pushes in them, using an empty home folder and no global git config so personal settings do not interfere. These tests are marked `git`. To skip them, run `uv run pytest -m "not git"`.
