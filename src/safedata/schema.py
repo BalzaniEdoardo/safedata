@@ -42,6 +42,9 @@ class KeyGroup(IntEnum):
 class Schema:
     key: str
     columns: list[Column]
+    # Groups of columns whose values, together, must differ between records,
+    # e.g. [["country", "city", "neighborhood"]]. Empty: duplicates are allowed.
+    unique_entries: list[list[str]] = field(default_factory=list)
 
     @property
     def names(self) -> list[str]:
@@ -79,6 +82,7 @@ class SchemaError(ValueError):
         self.problems = problems
 
 
+TOP_LEVEL = ("key", "unique_entries", "columns")
 SETTINGS = ("name", "type", "required", "unique", "choices", "min", "max", "description")
 _LIMITED_TYPES = ("int", "float", "date")  # the types that can have min and max
 
@@ -96,8 +100,8 @@ def parse_schema(raw) -> Schema:
     problems: list[str] = []
     if not isinstance(raw, dict):
         raise SchemaError(["the file must contain the settings `key` and `columns`"])
-    for setting in raw.keys() - {"key", "columns"}:
-        problems.append(f"unknown top-level setting {setting!r}; allowed: key, columns")
+    for setting in raw.keys() - set(TOP_LEVEL):
+        problems.append(f"unknown top-level setting {setting!r}; allowed: {', '.join(TOP_LEVEL)}")
     key_name = raw.get("key")
     if not isinstance(key_name, str) or not key_name:
         problems.append("`key` is required: the name of the column that identifies each record")
@@ -125,9 +129,44 @@ def parse_schema(raw) -> Schema:
             problems.append(f"the key column {key.name!r} must have type int, not {key.type!r}")
         key.required = key.unique = True
 
+    unique_entries = _parse_unique_entries(raw, [c.name for c in columns], key_name, problems)
+
     if problems:
         raise SchemaError(problems)
-    return Schema(key=key_name, columns=columns)
+    return Schema(key=key_name, columns=columns, unique_entries=unique_entries)
+
+
+def _parse_unique_entries(raw: dict, names: list[str], key_name, problems: list[str]) -> list[list[str]]:
+    """Read `unique_entries`, adding any problem to `problems`."""
+    example = "such as [[country, city, neighborhood]]"
+    if "unique_entries" not in raw:
+        problems.append("`unique_entries` is required: a list of column groups whose values, together, "
+                        f"must differ between records, {example}; use [] to allow duplicates")
+        return []
+    spec = raw["unique_entries"]
+    if not isinstance(spec, list):  # also `unique_entries:` with nothing after it, which YAML reads as null
+        problems.append(f"`unique_entries` must be a list of column groups, {example}, or [] to allow duplicates")
+        return []
+
+    groups: list[list[str]] = []
+    for i, group in enumerate(spec, start=1):
+        where = f"unique_entries, group {i}"
+        if not isinstance(group, list) or not group or not all(isinstance(c, str) and c for c in group):
+            problems.append(f"{where}: must be a list of column names, such as [country, city]")
+            continue
+        unknown = [c for c in group if c not in names]
+        if unknown:
+            problems.append(f"{where}: {', '.join(unknown)} {'is not a column' if len(unknown) == 1 else 'are not columns'}")
+        repeated = sorted({c for c in group if group.count(c) > 1})
+        if repeated:
+            problems.append(f"{where}: lists {', '.join(repeated)} more than once")
+        if key_name in group:
+            problems.append(f"{where}: includes the key column {key_name!r}, which is different in every record, "
+                            "so the group could never repeat")
+        if set(group) in [set(g) for g in groups]:
+            problems.append(f"{where}: has the same columns as an earlier group")
+        groups.append(group)
+    return groups
 
 
 def _parse_column(i: int, spec, problems: list[str]) -> Column | None:
@@ -356,6 +395,8 @@ def validate(header: list[str], rows: list[dict[str, str]], schema: Schema) -> l
         return errors
 
     seen: dict[str, dict[str, int]] = {c.name: {} for c in schema.columns if c.unique}
+    # for each unique_entries group: combination of values -> (line, record) where first seen
+    combos: list[dict[tuple[str, ...], tuple[int, str]]] = [{} for _ in schema.unique_entries]
     for line, row in enumerate(rows, start=2):
         where = f"Line {line} (record {row.get(schema.key) or '?'})"
         for col in schema.columns:
@@ -373,4 +414,15 @@ def validate(header: list[str], rows: list[dict[str, str]], schema: Schema) -> l
                     )
                 else:
                     seen[col.name][value] = line
+        for group, first in zip(schema.unique_entries, combos):
+            values = tuple(row.get(c, "") for c in group)
+            if "" in values:  # a record with an empty value in the group is not checked
+                continue
+            if values in first:
+                first_line, first_key = first[values]
+                errors.append(f"{where}: {', '.join(group)} ({', '.join(values)}) is the same as on "
+                              f"line {first_line} (record {first_key}); together, these columns must "
+                              "differ between records")
+            else:
+                first[values] = (line, row.get(schema.key) or "?")
     return errors
