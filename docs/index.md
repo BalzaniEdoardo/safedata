@@ -49,7 +49,7 @@ Where an established tool already does a job well, the workflow uses it, and saf
 ## Contents
 
 1. [Setting up a computer and a copy of the dataset](setup.md)
-2. [How the records are stored and checked](records.md): the key, the sorted file, the schema.
+2. [How the records are stored and checked](records.md): the table, the id column, the schema.
 3. [Editing records with safedata edit](editing.md)
 4. [Recording and reviewing changes with git](git.md)
 5. [Analysing the records in Excel](excel.md)
