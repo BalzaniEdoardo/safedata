@@ -131,11 +131,16 @@ def cmd_normalize(args) -> int:
     return 0
 
 
-def conflict_steps(ds: dataset.Dataset, path: str) -> str:
-    """How to finish a merge that left conflicts in the records file. `path` is as git shows it."""
+KEEP_ONE_VERSION = ("keep one version of each record: in your git tool's conflict view, in a text editor\n"
+                    "     (keep one line per block and delete the marker lines), or with `safedata edit`;")
+FIX_LISTED = ("fix the records listed above with `safedata edit` (for two records that repeat\n"
+              "     each other, correct one or delete it);")
+
+
+def conflict_steps(ds: dataset.Dataset, path: str, first_step: str = KEEP_ONE_VERSION) -> str:
+    """How to finish a merge that stopped on the records file. `path` is as git shows it."""
     return (f"To resolve, in the dataset folder {ds.root}:\n"
-            "  1. keep one version of each record: in your git tool's conflict view, in a text editor\n"
-            "     (keep one line per block and delete the marker lines), or with `safedata edit`;\n"
+            f"  1. {first_step}\n"
             f"  2. review the result and stage it:  git add {path}\n"
             "  3. finish the merge:                 git commit\n"
             "To cancel the merge instead:  git merge --abort\n")
@@ -166,6 +171,17 @@ def cmd_merge_driver(args) -> int:
               + conflict_steps(ds, args.path), file=sys.stderr)
         return 1
     store.write_file(args.ours, result.rows, schema)
+
+    # Git records an automatic merge without running the pre-commit check, so the
+    # combined records are checked here: each side was valid, but together they may
+    # not be (for example, both added the same entry under different ids).
+    errors = validate(schema.names, result.rows, schema)
+    if errors:
+        print(f"safedata: the changes to {args.path} were combined, but together they break the schema:\n"
+              + "".join(f"  - {e}\n" for e in errors[:50])
+              + (f"  ... and {len(errors) - 50} more\n" if len(errors) > 50 else "")
+              + conflict_steps(ds, args.path, FIX_LISTED), file=sys.stderr)
+        return 1
     return 0
 
 
