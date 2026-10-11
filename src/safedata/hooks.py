@@ -28,7 +28,17 @@ def check_line(python: str) -> str:
 
 
 def block(python: str) -> str:
-    return f"{BEGIN}\n{check_line(python)}\n{END}\n"
+    # The tool's path is fixed at install time. If the tool is removed or moved
+    # later, stop the commit with instructions instead of a bare "not found" error.
+    return (f"{BEGIN}\n"
+            f'if [ -x "{python}" ]; then\n'
+            f"  {check_line(python)}\n"
+            "else\n"
+            f'  echo "safedata: the tool used by this clone ({python}) is not installed anymore." >&2\n'
+            "  echo \"Reinstall safedata (see the dataset's README), then run 'safedata install' in this folder.\" >&2\n"
+            "  exit 1\n"
+            "fi\n"
+            f"{END}\n")
 
 
 def update_pre_commit(existing: str | None, python: str) -> str:

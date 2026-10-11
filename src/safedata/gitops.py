@@ -40,5 +40,22 @@ def status(root: Path) -> dict:
     return info
 
 
+def safedata_config(root: Path) -> dict[str, str]:
+    """The safedata entries in this clone's git config, e.g. {"filter.safedata.clean": "..."}."""
+    out = git("config", "--get-regexp", r"^(filter|merge|diff)\.safedata\.", cwd=root, check=False)
+    return dict(line.split(" ", 1) for line in out.splitlines() if " " in line)
+
+
+def attributes(root: Path, path: str, names: list[str]) -> dict[str, str]:
+    """The git attributes `names` of `path`, as git resolves them from .gitattributes."""
+    out = git("check-attr", *names, "--", path, cwd=root)
+    # each line: "<path>: <attribute>: <value>"
+    return {parts[1]: parts[2] for parts in (line.rsplit(": ", 2) for line in out.splitlines()) if len(parts) == 3}
+
+
+def hooks_dir(root: Path) -> Path:
+    return root / git("rev-parse", "--git-path", "hooks", cwd=root).strip()
+
+
 def set_config(root: Path, name: str, value: str) -> None:
     git("config", name, value, cwd=root)

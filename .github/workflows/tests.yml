@@ -19,3 +19,34 @@ jobs:
         run: git --version
       - name: Run tests
         run: uv run pytest -q
+
+  # Runs the installers on clean machines, the way a new user would: without
+  # setup-uv, so the scripts install uv themselves. Installs this commit
+  # (SAFEDATA_SOURCE), then runs the installer again to check upgrading.
+  installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      SAFEDATA_SOURCE: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - name: Install (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: |
+          sh install.sh
+          sh install.sh
+          "$HOME/.local/bin/safedata" --help
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # A script's `exit 1` does not stop a pwsh step by itself, so check after each command.
+        run: |
+          ./install.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./install.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:USERPROFILE\.local\bin\safedata.exe" --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

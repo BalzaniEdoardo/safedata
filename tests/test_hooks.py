@@ -1,3 +1,6 @@
+import shutil
+import subprocess
+
 import pytest
 
 from safedata.hooks import BEGIN, END, ForeignHook, block, update_pre_commit
@@ -38,5 +41,18 @@ def test_non_shell_hook_is_left_alone():
         update_pre_commit("#!/usr/bin/env python3\nprint('hi')\n", PY)
 
 
-def test_block_markers():
-    assert block(PY).splitlines() == [BEGIN, f'"{PY}" -m safedata validate --staged || exit 1', END]
+def test_block_content():
+    lines = block(PY).splitlines()
+    assert lines[0] == BEGIN and lines[-1] == END
+    assert f'if [ -x "{PY}" ]; then' in lines
+    assert f'  "{PY}" -m safedata validate --staged || exit 1' in lines
+    assert any("is not installed anymore" in line for line in lines)
+
+
+@pytest.mark.skipif(shutil.which("sh") is None, reason="needs a POSIX shell")
+def test_block_runs_and_explains_a_missing_tool(tmp_path):
+    hook = tmp_path / "pre-commit"
+    hook.write_text(update_pre_commit(None, str(tmp_path / "gone" / "python")))
+    proc = subprocess.run(["sh", str(hook)], capture_output=True, text=True)
+    assert proc.returncode == 1
+    assert "is not installed anymore" in proc.stderr and "safedata install" in proc.stderr

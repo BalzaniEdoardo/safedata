@@ -19,7 +19,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from . import dataset, gitops, hooks, store
+from . import clonecheck, dataset, gitops, hooks, store
 from .merge import merge
 from .schema import validate
 from .webapp import serve
@@ -59,6 +59,33 @@ def cmd_install(args) -> int:
     return 0
 
 
+def cmd_check(args) -> int:
+    ds = dataset.find()
+    if not _in_git(ds):
+        raise dataset.DatasetError(f"{ds.root} is not inside a git repository")
+    root = gitops.repo_root(ds.root)
+    records = ds.records_path.relative_to(root).as_posix()
+    hook = gitops.hooks_dir(root) / "pre-commit"
+    problems = clonecheck.clone_problems(
+        records,
+        config=gitops.safedata_config(root),
+        hook_text=hook.read_text(encoding="utf-8") if hook.is_file() else None,
+        attrs=gitops.attributes(root, records, list(clonecheck.ATTRIBUTES)),
+    )
+    if not problems:
+        print(f"This clone ({root}) is set up: the git add-ons are configured for {records}.")
+        return 0
+    print(f"This clone ({root}) is not fully set up:", file=sys.stderr)
+    for p in problems:
+        print(f"  - {p.message}", file=sys.stderr)
+    if any(p.fixed_by_install for p in problems):
+        print("Run `safedata install` in this folder to set up the git add-ons.", file=sys.stderr)
+    if not all(p.fixed_by_install for p in problems):
+        print(f"Add this line to .gitattributes and commit it:\n"
+              f"  {records}  filter=safedata merge=safedata diff=safedata text eol=lf", file=sys.stderr)
+    return 1
+
+
 def _in_git(ds: dataset.Dataset) -> bool:
     try:
         gitops.repo_root(ds.root)
@@ -73,7 +100,7 @@ def install(root: Path) -> None:
     gitops.set_config(root, "merge.safedata.name", "safedata record-level merge")
     gitops.set_config(root, "merge.safedata.driver", f'"{py}" -m safedata merge-driver %O %A %B %L %P')
     gitops.set_config(root, "diff.safedata.wordRegex", "[^,]+")
-    hooks_dir = root / gitops.git("rev-parse", "--git-path", "hooks", cwd=root).strip()
+    hooks_dir = gitops.hooks_dir(root)
     hooks_dir.mkdir(parents=True, exist_ok=True)
     hook = hooks_dir / "pre-commit"
     existing = hook.read_text(encoding="utf-8") if hook.is_file() else None
@@ -254,6 +281,13 @@ the records file: the clean filter, the merge driver, the word-diff setting
 (written to .git/config) and the check in .git/hooks/pre-commit. Settings
 in .git/ are not copied between clones, so every clone needs this once;
 `safedata edit` runs it automatically. Running it again is harmless.""")
+
+    command("check", cmd_check, "check that this clone is set up for the git add-ons", """\
+Report whether this clone of the dataset repository is set up: the git settings
+written by `safedata install` are present and point to an installed tool, the
+pre-commit hook runs the safedata check, and .gitattributes assigns the add-ons
+to the records file. Changes nothing. Exits with status 1 if anything is
+missing, and says how to fix it.""")
 
     p = command("validate", cmd_validate, "check the records against the schema", """\
 Check the records file against the schema and list every problem. Exits with
