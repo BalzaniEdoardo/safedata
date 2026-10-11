@@ -7,6 +7,7 @@ Saving in the editor changes `records.csv`, but it does not record the change in
 | Word | Meaning |
 |---|---|
 | **repository** | the dataset folder together with its complete history |
+| **add** (or **stage**) | choosing which changed files go into the next commit; graphical programs call it *Stage* |
 | **commit** | one recorded change: what changed, who made it, when, and a message describing it; also the act of recording it |
 | **push** | sending your commits to the shared copy of the repository (for example on GitHub), so others can get them |
 | **pull** | getting the commits others have pushed, and combining them with yours |
@@ -18,7 +19,7 @@ Saving in the editor changes `records.csv`, but it does not record the change in
 1. **Get the latest version** before you start, so you edit the current records: `git pull`.
 2. **Edit and save** with `safedata edit`.
 3. **Review what changed.** Your git program shows the records you changed, one line per record; check that they are the changes you meant.
-4. **Commit** the change with a message that says what you changed and why.
+4. **Add** `data/records.csv`, then **commit** it with a message that says what you changed and why.
 5. **Push**, so your colleagues get it.
 
 On the command line, steps 3 to 5 are:
