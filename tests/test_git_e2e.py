@@ -87,7 +87,7 @@ def team(tmp_path, monkeypatch):
     git(bob, "config", "user.name", "Bob")
     git(bob, "config", "user.email", "bob@example.org")
     cli.install(bob)
-    return SimpleNamespace(alice=alice, bob=bob)
+    return SimpleNamespace(alice=alice, bob=bob, server=server)
 
 
 def test_saving_only_changes_the_records_file(team):
@@ -175,3 +175,17 @@ def test_history_of_one_record(team):
     log = git(team.alice, "log", "-L", f"/^1,/,+1:{RECORDS}", "--format=%s").stdout
     assert "second change to 1" in log and "first change to 1" in log
     assert "change to 3" not in log  # the commit that touched only record 3 is not listed
+
+
+def test_check_reports_a_clone_without_install(team, tmp_path, monkeypatch, capsys):
+    carol = tmp_path / "carol"
+    git(tmp_path, "clone", "-q", str(team.server), str(carol))
+    monkeypatch.chdir(carol)
+
+    assert cli.main(["check"]) == 1  # a fresh clone: .git has none of the settings
+    err = capsys.readouterr().err
+    assert "filter.safedata.clean is not set" in err and "Run `safedata install`" in err
+
+    cli.install(carol)
+    assert cli.main(["check"]) == 0
+    assert "is set up" in capsys.readouterr().out
