@@ -81,6 +81,6 @@ If the records file changed after the page was opened, for example because you g
 
 !!! warning "The third safeguard works only in a copy where safedata is set up"
 
-    The git check runs only in copies of the dataset where safedata has been installed for the records with `safedata install`, because its settings are stored in each copy separately. In a copy that is not set up, a file edited by hand is recorded in the history without being checked or standardized. This is why every copy must be set up before anyone edits the records: see [Setting up](setup.md), in particular the sections on installing safedata for the records and on checking the installation.
+    The git check runs only in copies of the dataset where safedata has been installed for the records with `safedata install`, because its settings are stored in each copy separately. In a copy that is not set up, a file edited by hand is recorded in the history without being checked or standardized. This is why every copy must be set up before anyone edits the records: see [Installing safedata for the records](setup.md#installing-safedata-for-the-records) and [Checking the installation](setup.md#checking-the-installation).
 
     If the dataset is shared through GitHub, the check that runs there flags such a change when it arrives. And because every change is kept in the history with its author and date, the change that introduced a problem can always be found and corrected.
