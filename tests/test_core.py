@@ -61,7 +61,7 @@ def test_sort_key_groups(schema):
 
 def write_schema(tmp_path, key_spec):
     path = tmp_path / "schema.yaml"
-    path.write_text(f"key: id\ncolumns:\n  - name: id\n{key_spec}  - name: note\n    type: string\n")
+    path.write_text(f"key: id\nunique_entries: []\ncolumns:\n  - name: id\n{key_spec}  - name: note\n    type: string\n")
     return path
 
 
@@ -76,6 +76,7 @@ def test_key_is_always_required_and_unique(tmp_path):
 def test_schema_rules_all_reported_together():
     raw = {
         "key": "id",
+        "unique_entries": [],
         "colums": [],  # misspelled top-level setting
         "columns": [
             {"name": "id", "type": "int"},
@@ -123,6 +124,70 @@ def test_schema_needs_key_and_columns():
     with pytest.raises(SchemaError) as e:
         parse_schema({})
     assert [p.split(":")[0] for p in e.value.problems] == ["`key` is required", "`columns` is required"]
+
+
+PLACES = {
+    "key": "id",
+    "unique_entries": [["country", "city", "neighborhood"]],
+    "columns": [{"name": "id", "type": "int"}, {"name": "country", "type": "string"},
+                {"name": "city", "type": "string"}, {"name": "neighborhood", "type": "string"},
+                {"name": "year", "type": "int"}],
+}
+
+
+def place(id, country="Italy", city="Rome", neighborhood="Trastevere", year="2024"):
+    return {"id": str(id), "country": country, "city": city, "neighborhood": neighborhood, "year": year}
+
+
+def test_unique_entries_reject_repeated_combinations():
+    schema = parse_schema(PLACES)
+    rows = [place(1), place(2, neighborhood="Monti"), place(3), place(4, city="Milan")]
+    [error] = validate(schema.names, rows, schema)
+    assert error == ("Line 4 (record 3): country, city, neighborhood (Italy, Rome, Trastevere) is the same "
+                     "as on line 2 (record 1); together, these columns must differ between records")
+
+
+def test_unique_entries_skip_records_with_an_empty_value():
+    schema = parse_schema(PLACES)
+    rows = [place(1, neighborhood=""), place(2, neighborhood=""), place(3)]
+    assert validate(schema.names, rows, schema) == []
+
+
+def test_unique_entries_empty_list_allows_duplicates():
+    schema = parse_schema({**PLACES, "unique_entries": []})
+    assert validate(schema.names, [place(1), place(2)], schema) == []
+
+
+def test_unique_entries_setting_is_checked():
+    with pytest.raises(SchemaError) as e:
+        parse_schema({k: v for k, v in PLACES.items() if k != "unique_entries"})
+    assert "`unique_entries` is required" in e.value.problems[0]
+
+    with pytest.raises(SchemaError) as e:
+        parse_schema({**PLACES, "unique_entries": None})  # `unique_entries:` with nothing after it
+    assert "`unique_entries` must be a list" in e.value.problems[0]
+
+    with pytest.raises(SchemaError) as e:
+        parse_schema({**PLACES, "unique_entries": [
+            "country",                      # not a list
+            [],                             # empty group
+            ["country", "town"],            # unknown column
+            ["city", "city"],               # repeated column
+            ["id", "year"],                 # contains the key
+            ["city", "country"],            # same columns as ...
+            ["country", "city"],            # ... this group
+        ]})
+    expected = [
+        "group 1: must be a list of column names",
+        "group 2: must be a list of column names",
+        "group 3: town is not a column",
+        "group 4: lists city more than once",
+        "group 5: includes the key column 'id'",
+        "group 7: has the same columns as an earlier group",
+    ]
+    for text in expected:
+        assert any(text in p for p in e.value.problems), text
+    assert len(e.value.problems) == len(expected)
 
 
 def test_key_must_be_an_int_column(tmp_path):

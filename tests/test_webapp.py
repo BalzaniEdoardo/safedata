@@ -117,3 +117,14 @@ def test_new_column_needs_only_a_schema_change(folder):
     assert cols["weather"] == {"kind": "select", "options": ["dry", "wet"], "sort": "text"}
     problems = webapp.check(folder, {"rows": {"1": {**make_row(1), "depth": "99", "weather": "snow"}}})
     assert set(problems["problems"]["1"]) == {"depth", "weather"}
+
+
+def test_save_refuses_a_duplicate_entry(folder):
+    folder.schema_path.write_text(folder.schema_path.read_text().replace(
+        "unique_entries: []", "unique_entries:\n  - [date, site, notes]"))
+    state = webapp.get_state(folder)
+    with pytest.raises(webapp.Refused) as e:
+        webapp.save(folder, {"version": state["version"], "updates": {"1": {"notes": ["", "rain"]}},
+                             "adds": [make_row("", notes="rain")]})
+    assert "date, site, notes (2020-01-01, North, rain) is the same as on line" in e.value.problems[0]
+    assert [r["notes"] for r in records(folder)] == ["", "", ""]  # nothing was saved
