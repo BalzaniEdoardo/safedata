@@ -39,10 +39,15 @@ safedata requires one extra column in every table, called `id` in the template: 
 
 ## The schema: which values are allowed
 
-The schema, `data/schema.yaml`, is used to validate the entries when the records are edited. Think of it as a way to constrain the format and content of each column: what kind of value it holds, whether it can be empty, and which values are allowed. An excerpt from the example dataset:
+The schema, `data/schema.yaml`, is used to validate the entries when the records are edited. Think of it as a way to constrain the format and content of each column: what kind of value it holds, whether it can be empty, and which values are allowed.
+
+The schema has three parts: `key` names the [id column](#the-id-column-a-number-that-identifies-each-record), `unique_entries` lists the columns that must not repeat together (described [below](#entries-that-must-not-repeat)), and `columns` describes each column. An excerpt from the example dataset, without its comments:
 
 ```yaml
 key: id
+
+unique_entries:
+  - [date, site]
 
 columns:
   - name: id
@@ -88,6 +93,23 @@ The `type` setting accepts these types:
 | `bool` | yes/no | `true` or `false` |
 | `choice` | one of `choices` | the choice, spelled as in the schema |
 | `string` | any text on one line | the text |
+
+### Entries that must not repeat
+
+The id is different in every record by construction, so it cannot tell when the same entry has been recorded twice: for example, when two people add the same observation at the same time, and each copy gets its own number.
+
+`unique_entries` closes this gap. It lists groups of columns whose values, together, identify an entry, so no two records may have the same combination. In the example dataset, the group `[date, site]` allows at most one record per site and day:
+
+```yaml
+unique_entries:
+  - [date, site]
+```
+
+A record that repeats the values of a group is refused when the records are saved in the editor, when a change is committed, and when two people's changes are combined (see [When several people change the records at the same time](git.md#when-several-people-change-the-records-at-the-same-time)).
+
+- A group can have any number of columns, and the list can have several groups, each on its own line.
+- A record with an empty value in any column of a group is not checked against that group.
+- The setting is required. To allow duplicates, write `unique_entries: []`.
 
 !!! note "When the columns change, update the schema"
 
