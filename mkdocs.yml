@@ -1,0 +1,27 @@
+site_name: safedata
+site_description: A table of records kept in a git repository, changed with a validating editor, analysed in Excel.
+repo_url: https://github.com/BalzaniEdoardo/safedata
+repo_name: BalzaniEdoardo/safedata
+
+# Fail the build on broken links or pages missing from the navigation.
+strict: true
+
+theme:
+  name: material
+  features:
+    - content.code.copy   # copy button on code blocks, so commands are not copied from the page by hand
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+# In reading order. Every page in docs/ must be listed here (strict mode).
+nav:
+  - Keeping a table of records safe: index.md
+  - Setting up: setup.md
+  - How the records are stored and checked: records.md
+  - Editing records: editing.md
+  - Recording changes with git: git.md
+  - Analysing in Excel: excel.md

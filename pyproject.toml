@@ -13,6 +13,8 @@ safedata = "safedata.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]
+# mkdocs 2.0 drops the theme and plugin system that Material for MkDocs relies on; stay on 1.x.
+docs = ["mkdocs-material>=9", "mkdocs>=1.6,<2"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
