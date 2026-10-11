@@ -18,13 +18,31 @@ Everything that involves history (reviewing, committing, merging, browsing past 
 
 ## Installing
 
-Requires [git](https://git-scm.com) and [uv](https://docs.astral.sh/uv/).
+The only requirement is [git](https://git-scm.com). On a new Mac, run `git --version` once in Terminal first: if git is missing, macOS offers to install it with Apple's Command Line Tools.
+
+macOS and Linux:
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/BalzaniEdoardo/safedata/main/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/BalzaniEdoardo/safedata/main/install.ps1 | iex"
+```
+
+The installer ([install.sh](install.sh), [install.ps1](install.ps1)) installs [uv](https://docs.astral.sh/uv/) if it is missing, then safedata as a uv tool: a `safedata` command on the PATH, with its own environment and, if needed, its own Python. Everything goes into your home folder, so no administrator rights are needed. Running the installer again upgrades safedata. Open a new terminal afterwards so the command is found.
+
+Installing the tool is done once per computer. Each clone of a dataset repository then needs `safedata install`, run inside it; see the dataset's README.
+
+If uv is already installed, the installer's main step is the same as running:
 
 ```sh
 uv tool install git+https://github.com/BalzaniEdoardo/safedata
 ```
 
-This puts a `safedata` command on the PATH, in an environment of its own. For development, install from a local clone instead; `--editable` makes code changes take effect without reinstalling:
+For development, install from a local clone instead; `--editable` makes code changes take effect without reinstalling:
 
 ```sh
 uv tool install --editable ~/Code/safedata
@@ -38,6 +56,7 @@ Every command works on the dataset containing the current folder: the nearest fo
 |---|---|
 | `safedata edit` | opens the editor in the default browser; stop it with Ctrl+C |
 | `safedata install` | configures the git add-ons in this clone (also run by `edit`) |
+| `safedata check` | reports whether this clone is set up for the git add-ons, and how to fix what is missing; changes nothing |
 | `safedata validate` | checks the records file against the schema (`--staged` checks the version staged for commit) |
 | `safedata powerquery` | prints Power Query code for loading the records in Excel, generated from the schema |
 | `safedata normalize` | the git clean filter: reads the file on stdin, writes it sorted and normalized |
