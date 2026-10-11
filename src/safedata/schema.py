@@ -148,6 +148,10 @@ def _parse_unique_entries(raw: dict, names: list[str], key_name, problems: list[
         problems.append(f"`unique_entries` must be a list of column groups, {example}, or [] to allow duplicates")
         return []
 
+    if spec and all(isinstance(c, str) for c in spec):  # [date, site] instead of [[date, site]]
+        problems.append(f"`unique_entries` must be a list of column groups, each itself a list; for one group "
+                        f"of these columns write [[{', '.join(spec)}]], or on separate lines: - [{', '.join(spec)}]")
+        return []
     groups: list[list[str]] = []
     for i, group in enumerate(spec, start=1):
         where = f"unique_entries, group {i}"

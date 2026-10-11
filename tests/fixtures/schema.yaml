@@ -1,9 +1,11 @@
-# Describes the records table. The tools use it to validate every change,
-# to normalize the CSV, and to build the editing workbook.
+# Schema used by the tests. The test rows differ only in their id, so no
+# unique_entries group is set; the tests for that rule use their own schema.
 #
 # Column types: int, float, date (YYYY-MM-DD), bool (true/false), choice, string.
 
 key: id
+
+unique_entries: []
 
 columns:
   - name: id

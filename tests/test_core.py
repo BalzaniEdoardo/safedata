@@ -168,6 +168,11 @@ def test_unique_entries_setting_is_checked():
     assert "`unique_entries` must be a list" in e.value.problems[0]
 
     with pytest.raises(SchemaError) as e:
+        parse_schema({**PLACES, "unique_entries": ["country", "city"]})  # one group, missing the outer list
+    assert e.value.problems == ["`unique_entries` must be a list of column groups, each itself a list; for one "
+                                "group of these columns write [[country, city]], or on separate lines: - [country, city]"]
+
+    with pytest.raises(SchemaError) as e:
         parse_schema({**PLACES, "unique_entries": [
             "country",                      # not a list
             [],                             # empty group
