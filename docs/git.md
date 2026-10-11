@@ -71,7 +71,8 @@ If you and a colleague both edited the records since your last pull, `git pull` 
 - changes to different records are combined;
 - changes to different values of the same record are combined;
 - new records added by both of you are all kept, and if both got the same number, one is renumbered with the next free number;
-- if both of you changed **the same value** differently, git cannot know which is right. It stops and reports a **conflict**, so that someone decides.
+- if both of you changed **the same value** differently, git cannot know which is right. It stops and reports a **conflict**, so that someone decides;
+- if the combined records **break the schema**, git also stops before recording the merge. This happens when each set of changes is valid on its own but not together: for example, when both of you added the same entry, each with its own number, so that it repeats one of the schema's [unique entries](records.md#entries-that-must-not-repeat).
 
 ### Resolving a conflict
 
@@ -105,6 +106,24 @@ Choose one version of each record in any of these ways:
 - with `safedata edit`, which detects the conflict and shows both versions of each record side by side, with the differing values highlighted. Choosing a version and writing the file is all it does.
 
 Then review the result, and finish the merge with `git add data/records.csv` and `git commit`. A file that still contains conflict markers cannot be committed.
+
+### Fixing combined records that break the schema
+
+When the combined records break the schema, the pull lists the problems, for example:
+
+```
+safedata: new record 3 was renumbered because that number was already taken
+safedata: the changes to data/records.csv were combined, but together they break the schema:
+  - Line 5 (record 4): date, site (2024-03-15, North) is the same as on line 4 (record 3); together, these columns must differ between records
+To resolve, in the dataset folder /Users/maria/Documents/records:
+  1. fix the records listed above with `safedata edit` (for two records that repeat
+     each other, correct one or delete it);
+  2. review the result and stage it:  git add data/records.csv
+  3. finish the merge:                 git commit
+To cancel the merge instead:  git merge --abort
+```
+
+Here both people recorded an observation at the North site on 15 March 2024, and the incoming one was renumbered to 4. The file contains all the combined records, without conflict markers. Open it with `safedata edit`, correct or delete one of the two records, save, and finish the merge with `git add data/records.csv` and `git commit`.
 
 ## Marking a final version
 

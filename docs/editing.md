@@ -64,7 +64,7 @@ If the records file changed after the page was opened, for example because you g
 
 `records.csv` is a text file, and nothing stops anyone from opening it in a text editor or a spreadsheet program and accidentally introducing invalid or badly formatted entries. safedata sets up safeguards that make sure every edit is correct before it is recorded in the change history. The first two act while you edit with safedata; the third also applies to edits made with any other program.
 
-1. **The editor enforces the schema.** Each value is checked against the schema as soon as it is entered: dates must be real dates in the allowed range, numbers must be numbers, categories must be in the list. A value that does not conform is flagged as a mistake and explained, at the moment you still know what you meant to write, and *Save* stays disabled until every problem is fixed.
+1. **The editor enforces the schema.** Each value is checked against the schema as soon as it is entered: dates must be real dates in the allowed range, numbers must be numbers, categories must be in the list. A value that does not conform is flagged as a mistake and explained, at the moment you still know what you meant to write, and *Save* stays disabled until every problem is fixed. Entries that repeat another record (see [Entries that must not repeat](records.md#entries-that-must-not-repeat)) are found when you save: the save is refused, and both records are named.
 
 2. **Saved records are always written in a standard form.** The same records always produce exactly the same file:
 
