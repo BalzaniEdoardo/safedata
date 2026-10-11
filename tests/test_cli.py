@@ -59,6 +59,14 @@ def test_pre_commit_check_passes_outside_a_dataset(tmp_path, monkeypatch, capsys
     assert capsys.readouterr().err == ""
 
 
+def test_invalid_schema_problems_are_listed(ds, capsys):
+    write(ds.records_path, [make_row(1)], ds)
+    ds.schema_path.write_text(ds.schema_path.read_text().replace("type: int", "type: string", 1))
+    assert cli.main(["validate"]) == 1
+    err = capsys.readouterr().err
+    assert "is not valid:\n  - the key column 'id' must have type int" in err and "Traceback" not in err
+
+
 def test_missing_files(ds, capsys):
     assert cli.main(["validate"]) == 1
     assert "the records file" in capsys.readouterr().err

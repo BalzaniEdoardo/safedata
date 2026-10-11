@@ -16,7 +16,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema import Schema, load_schema
+from .schema import Schema, SchemaError, load_schema
 
 MARKER = "safedata.toml"
 
@@ -46,7 +46,11 @@ class Dataset:
     def load_schema(self) -> Schema:
         if not self.schema_path.is_file():
             raise DatasetError(f"the schema file {self.schema_path} (set in {MARKER}) does not exist")
-        return load_schema(self.schema_path)
+        try:
+            return load_schema(self.schema_path)
+        except SchemaError as e:
+            raise DatasetError(f"the schema file {self.schema_path} is not valid:\n"
+                               + "\n".join(f"  - {p}" for p in e.problems)) from None
 
 
 def load(root: str | Path) -> Dataset:

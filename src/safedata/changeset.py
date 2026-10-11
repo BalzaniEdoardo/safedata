@@ -141,15 +141,9 @@ def apply(current: Rows, cs: Changeset, schema: Schema) -> ApplyResult:
             if rows[k] == row:
                 assigned[i] = k
                 continue
-            if schema.key_column.type != "int":
-                conflicts.append(Conflict(k, "*", "", "", "", "two different records were added with this key"))
-                continue
             notes.append(f"new record {k} was renumbered because that number was already taken")
             k = ""
-        if k == "":
-            if schema.key_column.type != "int":
-                conflicts.append(Conflict("(new)", "*", "", "", "", f"a new record has no {key}"))
-                continue
+        if k == "":  # keys are whole numbers (enforced by load_schema): take the next free one
             k = str(_next_int_key(rows))
             row[key] = k
         rows[k] = row

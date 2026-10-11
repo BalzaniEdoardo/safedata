@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import math
 from dataclasses import dataclass, field
+from enum import IntEnum
 from pathlib import Path
 
 import yaml
@@ -21,13 +22,20 @@ _FALSE = {"false", "no", "n", "0"}
 @dataclass
 class Column:
     name: str
-    type: str = "string"
+    type: str
     required: bool = False
     unique: bool = False
     choices: list[str] = field(default_factory=list)
     min: str | None = None
     max: str | None = None
     description: str = ""
+
+
+class KeyGroup(IntEnum):
+    """Groups that records are sorted in, by the kind of key they have."""
+    NUMBER = 0  # a whole number: every key in a valid file
+    TEXT = 1    # anything else; only in a file that fails validation
+    EMPTY = 2   # no key yet: a new record before it is numbered
 
 
 @dataclass
@@ -49,38 +57,147 @@ class Schema:
     def key_column(self) -> Column:
         return self.column(self.key)
 
-    def sort_key(self, value: str):
-        """Order records by key: numerically for int keys, blanks last."""
+    def sort_key(self, value: str) -> tuple[KeyGroup, int | str]:
+        """Order records by key: numbers first and numerically, then other text, then empty keys.
+
+        Values are compared only within a group, where they have the same type, so
+        sorting works (and validation can report the problem) even in an invalid file.
+        """
         if value == "":
-            return (1, 0, "")
-        if self.key_column.type == "int":
-            try:
-                return (0, int(value), "")
-            except ValueError:
-                pass
-        return (0, math.inf, value)
+            return (KeyGroup.EMPTY, "")
+        try:
+            return (KeyGroup.NUMBER, int(value))
+        except ValueError:
+            return (KeyGroup.TEXT, value)
+
+
+class SchemaError(ValueError):
+    """The schema file breaks one or more rules; `problems` lists them all."""
+
+    def __init__(self, problems: list[str]):
+        super().__init__("\n".join(problems))
+        self.problems = problems
+
+
+SETTINGS = ("name", "type", "required", "unique", "choices", "min", "max", "description")
+_LIMITED_TYPES = ("int", "float", "date")  # the types that can have min and max
 
 
 def load_schema(path: str | Path) -> Schema:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-    columns = []
-    for spec in raw["columns"]:
-        col = Column(
-            name=str(spec["name"]),
-            type=spec.get("type", "string"),
-            required=bool(spec.get("required", False)),
-            unique=bool(spec.get("unique", False)),
-            choices=[str(c) for c in spec.get("choices", [])],
-            description=spec.get("description", ""),
-        )
-        if col.type not in TYPES:
-            raise ValueError(f"column {col.name!r}: unknown type {col.type!r}")
-        col.min = canon(spec["min"], col) if "min" in spec else None
-        col.max = canon(spec["max"], col) if "max" in spec else None
-        columns.append(col)
-    schema = Schema(key=raw["key"], columns=columns)
-    schema.column(schema.key)  # the key must be one of the columns
-    return schema
+    """Read a schema file, checking every rule. Raises SchemaError listing all problems."""
+    try:
+        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        raise SchemaError([f"the file is not valid YAML: {e}"]) from None
+    return parse_schema(raw)
+
+
+def parse_schema(raw) -> Schema:
+    problems: list[str] = []
+    if not isinstance(raw, dict):
+        raise SchemaError(["the file must contain the settings `key` and `columns`"])
+    for setting in raw.keys() - {"key", "columns"}:
+        problems.append(f"unknown top-level setting {setting!r}; allowed: key, columns")
+    key_name = raw.get("key")
+    if not isinstance(key_name, str) or not key_name:
+        problems.append("`key` is required: the name of the column that identifies each record")
+    specs = raw.get("columns")
+    if not isinstance(specs, list) or not specs:
+        problems.append("`columns` is required: a list with one entry per column")
+        raise SchemaError(problems)
+
+    columns: list[Column] = []
+    for i, spec in enumerate(specs, start=1):
+        col = _parse_column(i, spec, problems)
+        if col is not None:
+            if col.name in [c.name for c in columns]:
+                problems.append(f"column {i} ({col.name}): the name is already used by another column")
+            columns.append(col)
+
+    # Records are identified by their key everywhere (saving, merging, conflicts), so
+    # it must be a whole number, present and unique in every record, whatever the
+    # schema file says. Int keys also let new records be numbered automatically.
+    key = next((c for c in columns if c.name == key_name), None)
+    if isinstance(key_name, str) and key_name and key is None:
+        problems.append(f"the key column {key_name!r} is not one of the columns")
+    elif key is not None:
+        if key.type != "int":
+            problems.append(f"the key column {key.name!r} must have type int, not {key.type!r}")
+        key.required = key.unique = True
+
+    if problems:
+        raise SchemaError(problems)
+    return Schema(key=key_name, columns=columns)
+
+
+def _parse_column(i: int, spec, problems: list[str]) -> Column | None:
+    """Build one column, adding any problem to `problems`. Returns None if it has no usable name."""
+    if not isinstance(spec, dict):
+        problems.append(f"column {i}: must be a list of settings (name, type, ...)")
+        return None
+    name = spec.get("name")
+    if not isinstance(name, str) or not name.strip():
+        problems.append(f"column {i}: `name` is required")
+        return None
+    where = f"column {i} ({name})"
+
+    for setting in spec.keys() - set(SETTINGS):
+        problems.append(f"{where}: unknown setting {setting!r}; allowed: {', '.join(SETTINGS)}")
+
+    t = spec.get("type")
+    if t is None:
+        problems.append(f"{where}: `type` is required; one of: {', '.join(TYPES)}")
+        return None
+    if t not in TYPES:
+        problems.append(f"{where}: unknown type {t!r}; one of: {', '.join(TYPES)}")
+        return None
+    col = Column(name=name, type=t)
+
+    for flag in ("required", "unique"):
+        if flag in spec:
+            if isinstance(spec[flag], bool):
+                setattr(col, flag, spec[flag])
+            else:
+                problems.append(f"{where}: `{flag}` must be true or false, not {spec[flag]!r}")
+
+    if "description" in spec:
+        if isinstance(spec["description"], str):
+            col.description = spec["description"]
+        else:
+            problems.append(f"{where}: `description` must be text")
+
+    choices = spec.get("choices")
+    if t == "choice":
+        if not isinstance(choices, list) or not choices:
+            problems.append(f"{where}: type choice needs `choices`, a non-empty list of the allowed values")
+        else:
+            col.choices = [str(c).strip() for c in choices]
+            if any(c == "" for c in col.choices):
+                problems.append(f"{where}: `choices` contains an empty value")
+            repeated = sorted({c for c in col.choices if col.choices.count(c) > 1})
+            if repeated:
+                problems.append(f"{where}: `choices` lists {', '.join(repeated)} more than once")
+    elif choices is not None:
+        problems.append(f"{where}: `choices` is only allowed for type choice")
+
+    for limit in ("min", "max"):
+        if limit not in spec:
+            continue
+        if t not in _LIMITED_TYPES:
+            problems.append(f"{where}: `{limit}` is only allowed for types {', '.join(_LIMITED_TYPES)}")
+            continue
+        value = canon(spec[limit], col)
+        if value == "":
+            problems.append(f"{where}: `{limit}` is empty; give a value or remove the setting")
+            continue
+        problem = is_valid_value(value, Column(name=name, type=t))
+        if problem:
+            problems.append(f"{where}: `{limit}` {problem}")
+        else:
+            setattr(col, limit, value)
+    if col.min is not None and col.max is not None and _typed(col.min, t) > _typed(col.max, t):
+        problems.append(f"{where}: `min` ({col.min}) is greater than `max` ({col.max})")
+    return col
 
 
 def canon(value, col: Column) -> str:

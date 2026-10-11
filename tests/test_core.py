@@ -1,13 +1,14 @@
 import datetime as dt
 import random
 
+import pytest
 from conftest import make_row
 
 from safedata import store
 from safedata.changeset import apply, diff
 from safedata.merge import merge
+from safedata.schema import KeyGroup, SchemaError, canon, load_schema, parse_schema, validate
 from safedata.store import has_conflicts, parse_conflicted, to_text_with_conflicts
-from safedata.schema import canon, validate
 
 
 # ---------------------------------------------------------------- schema
@@ -48,6 +49,89 @@ def test_validate_reports_problems(schema):
 
 def test_validate_header(schema):
     assert "Missing columns: notes" in validate(schema.names[:-1], [], schema)[0]
+
+
+def test_sort_key_groups(schema):
+    assert schema.sort_key("12") == (KeyGroup.NUMBER, 12)
+    assert schema.sort_key("A7") == (KeyGroup.TEXT, "A7")
+    assert schema.sort_key("") == (KeyGroup.EMPTY, "")
+    keys = ["10", "", "B", "9", "A", "-1", ""]
+    assert sorted(keys, key=schema.sort_key) == ["-1", "9", "10", "A", "B", "", ""]
+
+
+def write_schema(tmp_path, key_spec):
+    path = tmp_path / "schema.yaml"
+    path.write_text(f"key: id\ncolumns:\n  - name: id\n{key_spec}  - name: note\n    type: string\n")
+    return path
+
+
+def test_key_is_always_required_and_unique(tmp_path):
+    schema = load_schema(write_schema(tmp_path, "    type: int\n"))  # no required/unique in the file
+    rows = [{"id": "1", "note": "a"}, {"id": "1", "note": "b"}, {"id": "", "note": "c"}]
+    text = "\n".join(validate(schema.names, rows, schema))
+    assert "id: 1 is already used on line 2" in text
+    assert "id: is empty, but this column is required" in text
+
+
+def test_schema_rules_all_reported_together():
+    raw = {
+        "key": "id",
+        "colums": [],  # misspelled top-level setting
+        "columns": [
+            {"name": "id", "type": "int"},
+            {"name": "a"},                                              # no type
+            {"name": "b", "type": "text"},                              # unknown type
+            {"name": "c", "type": "string", "requird": True},           # misspelled setting
+            {"name": "d", "type": "string", "required": "yes"},         # not a boolean
+            {"name": "e", "type": "choice"},                            # no choices
+            {"name": "f", "type": "choice", "choices": ["x", "x"]},     # repeated choice
+            {"name": "g", "type": "int", "choices": ["x"]},             # choices on an int
+            {"name": "h", "type": "string", "min": 1},                  # min on a string
+            {"name": "i", "type": "int", "min": "abc"},                 # min not a number
+            {"name": "j", "type": "float", "min": 5, "max": 1},         # min > max
+            {"name": "k", "type": "date", "max": None},                 # empty max
+            {"name": "l", "type": "string", "description": 3},          # description not text
+            {"name": "id", "type": "int"},                              # name used twice
+            {"type": "int"},                                            # no name
+        ],
+    }
+    with pytest.raises(SchemaError) as e:
+        parse_schema(raw)
+    expected = [
+        "unknown top-level setting 'colums'",
+        "column 2 (a): `type` is required",
+        "column 3 (b): unknown type 'text'",
+        "column 4 (c): unknown setting 'requird'",
+        "column 5 (d): `required` must be true or false, not 'yes'",
+        "column 6 (e): type choice needs `choices`",
+        "column 7 (f): `choices` lists x more than once",
+        "column 8 (g): `choices` is only allowed for type choice",
+        "column 9 (h): `min` is only allowed for types int, float, date",
+        "column 10 (i): `min` 'abc' is not a whole number",
+        "column 11 (j): `min` (5) is greater than `max` (1)",
+        "column 12 (k): `max` is empty",
+        "column 13 (l): `description` must be text",
+        "column 14 (id): the name is already used by another column",
+        "column 15: `name` is required",
+    ]
+    for text in expected:
+        assert any(text in p for p in e.value.problems), text
+    assert len(e.value.problems) == len(expected)
+
+
+def test_schema_needs_key_and_columns():
+    with pytest.raises(SchemaError) as e:
+        parse_schema({})
+    assert [p.split(":")[0] for p in e.value.problems] == ["`key` is required", "`columns` is required"]
+
+
+def test_key_must_be_an_int_column(tmp_path):
+    with pytest.raises(ValueError, match="must have type int, not 'string'"):
+        load_schema(write_schema(tmp_path, "    type: string\n"))
+    path = tmp_path / "other.yaml"
+    path.write_text("key: number\ncolumns:\n  - name: id\n    type: int\n")
+    with pytest.raises(ValueError, match="'number' is not one of the columns"):
+        load_schema(path)
 
 
 # ---------------------------------------------------------------- store
