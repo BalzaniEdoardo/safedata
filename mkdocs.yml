@@ -10,10 +10,13 @@ theme:
   name: material
   features:
     - content.code.copy   # copy button on code blocks, so commands are not copied from the page by hand
+    - content.tabs.link   # choosing a system's tab (macOS, Windows, Linux) selects it on every page
 
 markdown_extensions:
   - admonition
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - toc:
       permalink: true
 
