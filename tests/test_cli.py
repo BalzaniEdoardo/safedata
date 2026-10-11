@@ -59,6 +59,16 @@ def test_pre_commit_check_passes_outside_a_dataset(tmp_path, monkeypatch, capsys
     assert capsys.readouterr().err == ""
 
 
+def test_powerquery_writes_the_path_into_the_query(ds, capsys):
+    assert cli.main(["powerquery"]) == 0
+    query = capsys.readouterr().out
+    assert query.startswith("let\n")  # only the query: can be redirected to a file and pasted
+    assert f'File.Contents("{ds.records_path}")' in query
+    assert "Encoding=65001, QuoteStyle=QuoteStyle.Csv" in query
+    assert '{"date", type date}' in query and '{"verified", type logical}' in query
+    assert "DataPath" not in query
+
+
 def test_invalid_schema_problems_are_listed(ds, capsys):
     write(ds.records_path, [make_row(1)], ds)
     ds.schema_path.write_text(ds.schema_path.read_text().replace("type: int", "type: string", 1))

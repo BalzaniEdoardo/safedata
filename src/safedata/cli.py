@@ -194,23 +194,33 @@ def cmd_validate(args) -> int:
 
 # ---------------------------------------------------------------- analysis
 
-def cmd_powerquery(args) -> int:
-    ds = dataset.find()
+M_TYPES = {"int": "Int64.Type", "float": "type number", "date": "type date",
+           "bool": "type logical", "choice": "type text", "string": "type text"}
+
+
+def power_query(ds: dataset.Dataset) -> str:
+    """Power Query (M) code that loads the records file of this clone into Excel.
+
+    The path is written into the query: Excel for Mac asks for a data gateway when
+    the path comes from a cell instead. Options: UTF-8, quoted values may contain
+    commas, numbers read with "." as decimal separator whatever the computer's region.
+    """
     schema = ds.load_schema()
-    m_types = {"int": "Int64.Type", "float": "type number", "date": "type date",
-               "bool": "type logical", "choice": "type text", "string": "type text"}
-    types = ",\n        ".join(f'{{"{c.name}", {m_types[c.type]}}}' for c in schema.columns)
-    print(f"// DataPath for this copy: {ds.records_path}")
-    print(f"""let
-    // Path to the records file, read from the cell named DataPath in this workbook
-    Path = Excel.CurrentWorkbook(){{[Name="DataPath"]}}[Content]{{0}}[Column1],
-    Source = Csv.Document(File.Contents(Path), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+    m_string = lambda s: '"' + s.replace('"', '""') + '"'  # M doubles quotes inside strings
+    types = ",\n        ".join(f"{{{m_string(c.name)}, {M_TYPES[c.type]}}}" for c in schema.columns)
+    return f"""let
+    Source = Csv.Document(File.Contents({m_string(str(ds.records_path))}), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
     Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
     Typed = Table.TransformColumnTypes(Promoted, {{
         {types}
     }}, "en-US")
 in
-    Typed""")
+    Typed
+"""
+
+
+def cmd_powerquery(args) -> int:
+    sys.stdout.write(power_query(dataset.find()))
     return 0
 
 
@@ -254,9 +264,11 @@ status 1 if there are problems, 0 otherwise.""")
     p.add_argument("--file", metavar="CSV", help="check this CSV file instead of the dataset's records file")
 
     command("powerquery", cmd_powerquery, "print Power Query code for Excel", """\
-Print the path of the records file and the Power Query (M) code that loads it
-into an Excel table with the column types from the schema. See the dataset's
-docs/EXCEL_SETUP.md for where to paste it.""")
+Print the Power Query (M) code that loads this clone's records file into an
+Excel table, with the column types from the schema. The file's path is written
+into the query, so each person generates it in their own clone. To get a file
+to copy from:  safedata powerquery > query.txt
+See the dataset's docs/EXCEL_SETUP.md for where to paste it.""")
 
     command("normalize", cmd_normalize, "git clean filter (called by git)", """\
 Called by git when the records file is staged, not by people. Reads the file on
