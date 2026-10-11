@@ -85,3 +85,23 @@ def test_missing_files(ds, capsys):
     ds.schema_path.unlink()
     assert cli.main(["validate"]) == 1
     assert "the schema file" in capsys.readouterr().err
+
+
+def test_merge_driver_stops_when_the_combined_records_repeat(ds, tmp_path, capsys):
+    """Both sides add the same entry under different ids: each side is valid, the merge is not."""
+    ds.schema_path.write_text(ds.schema_path.read_text().replace(
+        "unique_entries: []", "unique_entries:\n  - [date, site]"))
+    base = write(tmp_path / "base.csv", [make_row(1)], ds)
+    ours = write(tmp_path / "ours.csv", [make_row(1), make_row(2, date="2021-05-06")], ds)
+    theirs = write(tmp_path / "theirs.csv",
+                   [make_row(1), make_row(2, date="2022-01-01"), make_row(3, date="2021-05-06", observer="Luca")], ds)
+
+    assert cli.main(["merge-driver", base, ours, theirs, "7", "data/records.csv"]) == 1
+    err = capsys.readouterr().err
+    assert "were combined, but together they break the schema" in err
+    assert "date, site (2021-05-06, North) is the same as on line" in err
+    assert "fix the records listed above with `safedata edit`" in err and "git add data/records.csv" in err
+    # the combined records are written, without conflict markers, ready to be fixed
+    merged = store.read_file(ours, ds.load_schema())
+    assert [(r["id"], r["date"]) for r in merged] == [("1", "2020-01-01"), ("2", "2021-05-06"),
+                                                      ("3", "2022-01-01"), ("4", "2021-05-06")]

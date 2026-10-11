@@ -189,3 +189,32 @@ def test_check_reports_a_clone_without_install(team, tmp_path, monkeypatch, caps
     cli.install(carol)
     assert cli.main(["check"]) == 0
     assert "is set up" in capsys.readouterr().out
+
+
+def test_pull_stops_when_both_add_the_same_entry(team):
+    a, b = team.alice, team.bob
+    schema = a / "data" / "schema.yaml"
+    # the existing records have empty notes, so only the new ones are checked
+    schema.write_text(schema.read_text().replace("unique_entries: []", "unique_entries:\n  - [date, site, notes]"))
+    commit(a, "one record per date, site and note")
+    git(a, "push", "-q")
+    git(b, "pull", "-q", "--no-rebase", "--no-edit")
+
+    save(a, adds=[make_row("", notes="flood")])
+    commit(a, "Alice: flood")
+    git(a, "push", "-q")
+    save(b, adds=[make_row("", notes="flood", observer="Bob")])  # the same entry, recorded by Bob
+    commit(b, "Bob: flood")
+
+    pull = git(b, "pull", "--no-rebase", "--no-edit", check=False)
+    assert pull.returncode != 0  # git did not record the merge
+    assert "were combined, but together they break the schema" in output(pull)
+    assert "date, site, notes (2020-01-01, North, flood) is the same as on line" in output(pull)
+
+    # keep Bob's record, delete Alice's renumbered copy, then finish the merge
+    rows = records(b)
+    copy = next(k for k, r in rows.items() if r["notes"] == "flood" and r["observer"] == "Maria")
+    save(b, deletes={copy: rows[copy]})
+    git(b, "add", RECORDS)
+    git(b, "commit", "-q", "--no-edit")
+    assert [r["observer"] for r in records(b).values() if r["notes"] == "flood"] == ["Bob"]
