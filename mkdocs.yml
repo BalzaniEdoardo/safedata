@@ -1,4 +1,5 @@
 site_name: safedata
+site_url: https://balzaniedoardo.github.io/safedata/
 site_description: A table of records kept in a git repository, changed with a validating editor, analysed in Excel.
 repo_url: https://github.com/BalzaniEdoardo/safedata
 repo_name: BalzaniEdoardo/safedata
