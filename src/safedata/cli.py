@@ -19,7 +19,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from . import clonecheck, dataset, gitops, hooks, store
+from . import clonecheck, dataset, duplicates, gitops, hooks, store
 from .merge import merge
 from .schema import validate
 from .webapp import serve
@@ -237,6 +237,42 @@ def cmd_validate(args) -> int:
 
 # ---------------------------------------------------------------- analysis
 
+LARGE_TEXT_ONLY = 2000  # records above which a text-only group is announced as slow
+
+
+def cmd_audit_duplicates(args) -> int:
+    """Report records that look like the same entry. Always exits 0 when it could run: it is a report."""
+    if not 0 < args.threshold <= 1:
+        raise dataset.DatasetError(f"--threshold must be between 0 and 1, for example 0.85, not {args.threshold}")
+    ds = dataset.find()
+    schema = ds.load_schema()
+    text = ds.records_path.read_text(encoding="utf-8")
+    if store.has_conflicts(text):
+        raise dataset.DatasetError(f"{ds.records} still contains merge conflicts; resolve them first "
+                                   "(see `safedata validate`)")
+    rows = store.read_text(text, schema)
+
+    groups = [g for g in schema.unique_entries if any(schema.column(c).type in duplicates.SIMILAR_TYPES for c in g)]
+    if not groups:
+        print("Nothing to compare: the schema's unique_entries has no group with a text (string) column.")
+        return 0
+    for g in groups:
+        if all(schema.column(c).type in duplicates.SIMILAR_TYPES for c in g) and len(rows) > LARGE_TEXT_ONLY:
+            print(f"The group {', '.join(g)} has only text columns, so all {len(rows)} records are compared "
+                  "with each other; this may take a minute.", file=sys.stderr)
+
+    found = duplicates.find(rows, schema, threshold=args.threshold)
+    if not found:
+        print(f"No possible duplicates among {len(rows)} records (similarity threshold {args.threshold:.0%}).")
+        return 0
+    print(f"{len(found)} possible duplicate(s) among {len(rows)} records (similarity threshold {args.threshold:.0%}):")
+    for d in found:
+        print(f"  - {d.describe(schema)}")
+    print("These are only similar, not identical: check each pair, and correct or delete a record "
+          "with `safedata edit` where it is the same entry.")
+    return 0
+
+
 M_TYPES = {"int": "Int64.Type", "float": "type number", "date": "type date",
            "bool": "type logical", "choice": "type text", "string": "type text"}
 
@@ -312,6 +348,16 @@ status 1 if there are problems, 0 otherwise.""")
                    help="check the version staged for commit instead of the file on disk "
                         "(used by the pre-commit hook; passes when there is nothing to check)")
     p.add_argument("--file", metavar="CSV", help="check this CSV file instead of the dataset's records file")
+
+    p = command("audit-duplicates", cmd_audit_duplicates, "report records that look like the same entry", """\
+Look for records that are probably the same entry written slightly differently,
+such as "Trastevere" and "Trastevre", or "Rome" and "rome". For each group in the
+schema's unique_entries, the text (string) columns are compared by similarity,
+ignoring case and spacing, and the other columns of the group must be equal.
+This is a report: it changes nothing, and it exits with status 0 whether or not
+it finds anything, since similar records can be genuinely different.""")
+    p.add_argument("--threshold", type=float, default=duplicates.DEFAULT_THRESHOLD,
+                   help=f"how similar the text must be, from 0 to 1 (default: {duplicates.DEFAULT_THRESHOLD})")
 
     command("powerquery", cmd_powerquery, "print Power Query code for Excel", """\
 Print the Power Query (M) code that loads this clone's records file into an

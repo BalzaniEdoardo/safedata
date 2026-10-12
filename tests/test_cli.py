@@ -105,3 +105,22 @@ def test_merge_driver_stops_when_the_combined_records_repeat(ds, tmp_path, capsy
     merged = store.read_file(ours, ds.load_schema())
     assert [(r["id"], r["date"]) for r in merged] == [("1", "2020-01-01"), ("2", "2021-05-06"),
                                                       ("3", "2022-01-01"), ("4", "2021-05-06")]
+
+
+def test_audit_duplicates_reports_and_exits_0(ds, capsys):
+    ds.schema_path.write_text(ds.schema_path.read_text().replace(
+        "unique_entries: []", "unique_entries:\n  - [date, site, notes]"))
+    write(ds.records_path, [make_row(1, notes="flooded road"), make_row(2, notes="Flooded  road"),
+                            make_row(3, notes="dry")], ds)
+    assert cli.main(["audit-duplicates"]) == 0
+    out = capsys.readouterr().out
+    assert "1 possible duplicate(s) among 3 records" in out
+    assert "records 1 and 2: date, site, notes" in out and "100% similar" in out
+
+
+def test_audit_duplicates_nothing_to_compare_and_bad_threshold(ds, capsys):
+    write(ds.records_path, [make_row(1)], ds)
+    assert cli.main(["audit-duplicates"]) == 0  # unique_entries: [] in the fixture
+    assert "Nothing to compare" in capsys.readouterr().out
+    assert cli.main(["audit-duplicates", "--threshold", "85"]) == 1
+    assert "--threshold must be between 0 and 1" in capsys.readouterr().err
