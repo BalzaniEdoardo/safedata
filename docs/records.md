@@ -111,6 +111,25 @@ A record that repeats the values of a group is refused when the records are save
 - A record with an empty value in any column of a group is not checked against that group.
 - The setting is required. To allow duplicates, write `unique_entries: []`.
 
+#### Finding entries that are only similar
+
+The check above catches entries whose values are identical. The same entry can also be recorded twice with slightly different text, for example `Trastevere` and `Trastevre`, or `Rome` and `rome`. To look for these, run in the dataset folder:
+
+```sh
+safedata audit-duplicates
+```
+
+For each group in `unique_entries`, it compares the text columns by similarity, ignoring upper and lower case and extra spaces, and requires the other columns of the group, such as dates and numbers, to be equal. With the group `[country, city, neighborhood, year]`, for example:
+
+```
+2 possible duplicate(s) among 5 records (similarity threshold 85%):
+  - records 2 and 5: country, city, neighborhood, year (Italy, Rome, Monti, 2024 / Italy, rome, Monti, 2024), 100% similar
+  - records 1 and 3: country, city, neighborhood, year (Italy, Rome, Trastevere, 2024 / Italy, Rome, Trastevre, 2024), 98% similar
+These are only similar, not identical: check each pair, and correct or delete a record with `safedata edit` where it is the same entry.
+```
+
+A record for Trastevere in 2025 would not be listed, because the year differs. Similar records can be genuinely different, so this is a report for you to review: it changes nothing and blocks nothing. `--threshold` sets how similar the text must be, from 0 to 1 (default 0.85).
+
 !!! note "When the columns change, update the schema"
 
     Every time a column is added, removed or renamed in `records.csv`, the schema needs to be updated too, so that the two files keep describing the same table.

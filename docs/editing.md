@@ -58,6 +58,8 @@ Clicking a line in the list jumps to the cell. The edits cannot be saved until e
 
 After saving, the page lists the records that differ from the last version recorded in the history, under *Saved but not yet committed*. The list is a reminder of what is waiting to be recorded.
 
+Before committing, `safedata audit-duplicates` lists records that look like the same entry written slightly differently, such as `Trastevere` and `Trastevre`; see [Finding entries that are only similar](records.md#finding-entries-that-are-only-similar).
+
 If the records file changed after the page was opened, for example because you got your colleagues' latest changes in the meantime, your edits are applied to the current file, record by record. Edits to values that nobody else changed are saved normally. If one of your edits changes a value that was changed in the meantime, nothing is saved, and the page lists the values that clash, so that neither change is lost without you noticing. In that case, note your edits, reload the page to see the current records, and make the edits again where they are still needed; reloading discards all unsaved edits.
 
 ## What makes editing with safedata safe

@@ -18,13 +18,15 @@ Saving in the editor changes `records.csv`, but it does not record the change in
 
 1. **Get the latest version** before you start, so you edit the current records: `git pull`.
 2. **Edit and save** with `safedata edit`.
-3. **Review what changed.** Your git program shows the records you changed, one line per record; check that they are the changes you meant.
-4. **Add** `data/records.csv`, then **commit** it with a message that says what you changed and why.
-5. **Push**, so your colleagues get it.
+3. **Look for possible duplicates** with `safedata audit-duplicates`, which lists records that look like the same entry written slightly differently (see [Finding entries that are only similar](records.md#finding-entries-that-are-only-similar)). Correct or delete a record with `safedata edit` where needed.
+4. **Review what changed.** Your git program shows the records you changed, one line per record; check that they are the changes you meant.
+5. **Add** `data/records.csv`, then **commit** it with a message that says what you changed and why.
+6. **Push**, so your colleagues get it.
 
-On the command line, steps 3 to 5 are:
+On the command line, steps 3 to 6 are:
 
 ```sh
+safedata audit-duplicates
 git diff --word-diff data/records.csv
 git add data/records.csv
 git commit -m "Correct site of record 12: North, not South (field sheet 2024-03-15)"
